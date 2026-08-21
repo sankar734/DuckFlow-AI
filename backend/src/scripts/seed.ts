@@ -91,8 +91,8 @@ async function seed() {
     });
 
     const demoUser = await User.create({
-      name: 'Sankar Demo',
-      email: 'sankar@docuflow.ai',
+      name: 'Demo User',
+      email: 'demo@docuflow.ai',
       passwordHash: demoPasswordHash,
       role: UserRole.USER,
       planId: 'pro',

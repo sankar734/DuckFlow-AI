@@ -3,6 +3,7 @@ import { Mail, Link2, Copy, Check, Shield, Users, Globe } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
+import { useAuthStore } from '../../store/authStore';
 import { toast } from 'sonner';
 
 export const ShareModal: React.FC<{ isOpen: boolean; onClose: () => void; documentId?: string }> = ({
@@ -10,6 +11,7 @@ export const ShareModal: React.FC<{ isOpen: boolean; onClose: () => void; docume
   onClose,
   documentId,
 }) => {
+  const { user } = useAuthStore();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'VIEWER' | 'COMMENTER' | 'EDITOR'>('EDITOR');
   const [copied, setCopied] = useState(false);
@@ -67,11 +69,11 @@ export const ShareModal: React.FC<{ isOpen: boolean; onClose: () => void; docume
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-brand-600 text-white font-bold text-xs flex items-center justify-center">
-                  S
+                  {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-900 dark:text-white">You (Sankar)</div>
-                  <div className="text-[10px] text-slate-400">sankar@docuflow.ai</div>
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white">{user?.name ? `You (${user.name})` : 'You (Owner)'}</div>
+                  <div className="text-[10px] text-slate-400">{user?.email || 'owner@docuflow.ai'}</div>
                 </div>
               </div>
               <span className="text-[10px] font-semibold text-slate-400">Owner</span>

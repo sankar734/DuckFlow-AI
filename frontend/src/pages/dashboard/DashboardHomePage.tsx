@@ -69,7 +69,7 @@ export const DashboardHomePage: React.FC = () => {
             <span>DocuFlow AI Workspace Active</span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
-            Good afternoon, {user?.name || 'Sankar'} 👋
+            Good afternoon, {user?.name || user?.email?.split('@')[0] || 'there'} 👋
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
             What would you like to create or convert today? Choose an intelligent workspace or prompt the AI Copilot.

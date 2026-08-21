@@ -89,7 +89,7 @@ export const RegisterPage: React.FC = () => {
           <Input
             label="Full Name"
             type="text"
-            placeholder="Sankar Sri"
+            placeholder="John Doe"
             value={name}
             onChange={(e) => setName(e.target.value)}
             leftIcon={<UserIcon className="w-4 h-4" />}
@@ -99,7 +99,7 @@ export const RegisterPage: React.FC = () => {
           <Input
             label="Email Address"
             type="email"
-            placeholder="sankar@example.com"
+            placeholder="name@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             leftIcon={<Mail className="w-4 h-4" />}

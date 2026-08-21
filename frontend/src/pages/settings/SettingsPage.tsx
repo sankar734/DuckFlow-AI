@@ -21,9 +21,9 @@ export const SettingsPage: React.FC = () => {
   const { user, updateUser } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
 
-  const [name, setName] = useState(user?.name || 'Sankar');
-  const [email, setEmail] = useState(user?.email || 'sankar@docuflow.ai');
-  const [phone, setPhone] = useState(user?.phone || '+91 98765 43210');
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [emailNotif, setEmailNotif] = useState(true);
   const [aiNotif, setAiNotif] = useState(true);
 

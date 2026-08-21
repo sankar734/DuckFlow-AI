@@ -216,7 +216,7 @@ export const adminService = {
           ],
         },
         recentUsers: [
-          { _id: 'u1', name: 'Sankar', email: 'sankar@docuflow.ai', role: 'USER', planId: 'pro', createdAt: new Date().toISOString() },
+          { _id: 'u1', name: 'David Miller', email: 'david@enterprise.io', role: 'USER', planId: 'pro', createdAt: new Date().toISOString() },
           { _id: 'u2', name: 'Alex Mercer', email: 'alex@enterprise.com', role: 'USER', planId: 'business', createdAt: new Date().toISOString() },
           { _id: 'u3', name: 'Priya Sharma', email: 'priya@techflow.io', role: 'USER', planId: 'pro', createdAt: new Date().toISOString() },
         ],
