@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 
 export interface ParsedWordDoc {
   html: string;
+  pages: string[];
   text: string;
   title: string;
 }
@@ -20,11 +21,71 @@ export interface ParsedSlide {
   title: string;
   subtitle?: string;
   bullets: string[];
-  theme: 'slate' | 'indigo' | 'emerald' | 'amber' | 'crimson';
+  theme: 'slate' | 'indigo' | 'emerald' | 'amber' | 'crimson' | 'cyber' | 'quartz' | 'midnight';
+}
+
+export function splitHtmlIntoPages(html: string): string[] {
+  if (!html || !html.trim()) {
+    return ['<p><em>(Empty document)</em></p>'];
+  }
+
+  // Check for explicit page break markers
+  if (html.includes('<!-- PAGE') || html.includes('page-break') || html.includes('class="page-break"')) {
+    const parts = html
+      .split(/<div[^>]*class="[^"]*page-break[^"]*"[^>]*>|<\/div><div class="page-break">|<!-- PAGE \d+ -->/i)
+      .filter((p) => p.trim());
+    if (parts.length > 0) return parts;
+  }
+
+  if (html.includes('<hr') || html.includes('<hr/>') || html.includes('<hr />')) {
+    const hrParts = html.split(/<hr[^>]*\/?>/i).filter((p) => p.trim());
+    if (hrParts.length > 1) return hrParts;
+  }
+
+  // Parse DOM elements and group into discrete ~350-word pages matching A4 standard
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const elements = Array.from(doc.body.children);
+
+    if (elements.length <= 1) {
+      return [html];
+    }
+
+    const pages: string[] = [];
+    let currentPageHtml = '';
+    let currentWords = 0;
+
+    for (const el of elements) {
+      const text = el.textContent || '';
+      const words = text.trim().split(/\s+/).filter(Boolean).length;
+      const tagName = el.tagName.toLowerCase();
+      const isMajorHeader = tagName === 'h1' || tagName === 'h2';
+
+      if ((currentWords > 240 && isMajorHeader) || (currentWords + words > 380 && currentWords > 120)) {
+        if (currentPageHtml.trim()) {
+          pages.push(currentPageHtml);
+        }
+        currentPageHtml = el.outerHTML;
+        currentWords = words;
+      } else {
+        currentPageHtml += el.outerHTML;
+        currentWords += words;
+      }
+    }
+
+    if (currentPageHtml.trim()) {
+      pages.push(currentPageHtml);
+    }
+
+    return pages.length > 0 ? pages : [html];
+  } catch {
+    return [html];
+  }
 }
 
 /**
- * Parse Word document (.docx, .doc, .html, .txt) into clean HTML & plain text
+ * Parse Word document (.docx, .doc, .html, .txt) into clean HTML & discrete A4 pages
  */
 export async function parseWordDocument(file: File): Promise<ParsedWordDoc> {
   const fileName = file.name;
@@ -37,20 +98,24 @@ export async function parseWordDocument(file: File): Promise<ParsedWordDoc> {
     const rawTextResult = await mammoth.extractRawText({ arrayBuffer });
     let html = result.value;
 
-    // Enhance mammoth HTML output for our rich text editor
     if (!html || html.trim() === '') {
       html = '<p><em>(Empty document)</em></p>';
     }
 
+    const pages = splitHtmlIntoPages(html);
+
     return {
       html,
+      pages,
       text: rawTextResult.value,
       title: fileName,
     };
   } else if (isHtml) {
     const text = await file.text();
+    const pages = splitHtmlIntoPages(text);
     return {
       html: text,
+      pages,
       text: text.replace(/<[^>]*>?/gm, ''),
       title: fileName,
     };
@@ -62,8 +127,11 @@ export async function parseWordDocument(file: File): Promise<ParsedWordDoc> {
       .map((p) => `<p>${p.replace(/\r\n|\n/g, '<br/>')}</p>`)
       .join('');
 
+    const pages = splitHtmlIntoPages(html);
+
     return {
       html,
+      pages,
       text,
       title: fileName,
     };

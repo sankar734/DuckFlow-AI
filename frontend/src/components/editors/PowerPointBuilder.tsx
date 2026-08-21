@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Presentation,
   Plus,
@@ -23,6 +23,12 @@ import {
   Shapes,
   Type,
   X,
+  ArrowUp,
+  ArrowDown,
+  TrendingUp,
+  Quote,
+  CheckCircle2,
+  Sliders,
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
@@ -33,12 +39,19 @@ import { parsePowerPoint } from '../../utils/documentParsers';
 import { uploadToGoogleDrive } from '../../utils/googleDriveSync';
 import { toast } from 'sonner';
 
-interface Slide {
+export type PowerPointTheme = 'slate' | 'indigo' | 'emerald' | 'amber' | 'crimson' | 'cyber' | 'quartz' | 'midnight';
+export type SlideLayout = 'title' | 'content' | 'two_column' | 'stat' | 'quote' | 'blank';
+
+export interface Slide {
   id: string;
   title: string;
   subtitle?: string;
   bullets: string[];
-  theme: 'slate' | 'indigo' | 'emerald' | 'amber' | 'crimson';
+  theme: PowerPointTheme;
+  layout?: SlideLayout;
+  statNumber?: string;
+  statLabel?: string;
+  quoteAuthor?: string;
   imageUrl?: string;
   speakerNotes?: string;
 }
@@ -53,11 +66,12 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [isPlayingShow, setIsPlayingShow] = useState(false);
   const [showAIDeckModal, setShowAIDeckModal] = useState(false);
+  const [showLayoutModal, setShowLayoutModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaved, setIsSaved] = useState(true);
 
-  // Initial Slides
+  // Initial Presentation Slides
   const [slides, setSlides] = useState<Slide[]>([
     {
       id: 's_1',
@@ -69,6 +83,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
         'AI Ghostwriter and Real-Time Spreadsheet Analytics',
       ],
       theme: 'indigo',
+      layout: 'title',
       speakerNotes: 'Welcome stakeholders and introduce our core product pillars.',
     },
     {
@@ -81,6 +96,9 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
         'Projected 350% Year-over-Year revenue expansion',
       ],
       theme: 'emerald',
+      layout: 'stat',
+      statNumber: '+350%',
+      statLabel: 'Year-over-Year Enterprise Growth',
       speakerNotes: 'Highlight competitive advantages against legacy standalone software.',
     },
     {
@@ -92,7 +110,8 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
         'Client-side instant PDF compilation using Canvas vector pipelines',
         '99.99% High Availability SLA with automated regional failover',
       ],
-      theme: 'slate',
+      theme: 'cyber',
+      layout: 'two_column',
       speakerNotes: 'Address enterprise compliance standards and data isolation.',
     },
   ]);
@@ -105,18 +124,45 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
     setIsSaved(false);
   };
 
-  const handleAddSlide = () => {
+  const handleAddSlide = (layout: SlideLayout = 'content') => {
     const newSlide: Slide = {
       id: `s_${Date.now()}`,
-      title: 'New Presentation Slide',
-      subtitle: 'Add subtitle or key message here',
-      bullets: ['Enter bullet point item 1', 'Enter bullet point item 2'],
-      theme: 'indigo',
+      title: layout === 'title' ? 'New Presentation Title' : 'New Presentation Slide',
+      subtitle: 'Add key subtitle or takeaway message here',
+      bullets: ['Key takeaway deliverable 1', 'Key takeaway deliverable 2', 'Key takeaway deliverable 3'],
+      theme: activeSlide.theme || 'indigo',
+      layout,
+      statNumber: layout === 'stat' ? '99.9%' : undefined,
+      statLabel: layout === 'stat' ? 'Uptime & Reliability' : undefined,
+      quoteAuthor: layout === 'quote' ? 'Executive Leadership' : undefined,
     };
     setSlides([...slides, newSlide]);
     setActiveSlideIndex(slides.length);
     setIsSaved(false);
-    toast.success('Added new slide');
+    setShowLayoutModal(false);
+    toast.success('Added new presentation slide');
+  };
+
+  const handleMoveSlideUp = (idx: number) => {
+    if (idx <= 0) return;
+    const updated = [...slides];
+    const temp = updated[idx];
+    updated[idx] = updated[idx - 1];
+    updated[idx - 1] = temp;
+    setSlides(updated);
+    setActiveSlideIndex(idx - 1);
+    toast.success('Moved slide up');
+  };
+
+  const handleMoveSlideDown = (idx: number) => {
+    if (idx >= slides.length - 1) return;
+    const updated = [...slides];
+    const temp = updated[idx];
+    updated[idx] = updated[idx + 1];
+    updated[idx + 1] = temp;
+    setSlides(updated);
+    setActiveSlideIndex(idx + 1);
+    toast.success('Moved slide down');
   };
 
   const handleDuplicateSlide = (idx: number) => {
@@ -130,7 +176,10 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
   };
 
   const handleDeleteSlide = (idx: number) => {
-    if (slides.length <= 1) return;
+    if (slides.length <= 1) {
+      toast.error('Cannot delete the only slide');
+      return;
+    }
     const updated = slides.filter((_, i) => i !== idx);
     setSlides(updated);
     setActiveSlideIndex(Math.max(0, idx - 1));
@@ -153,90 +202,92 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
     if (!files || files.length === 0) return;
     const file = files[0];
     try {
-      toast.info(`Parsing ${file.name}...`);
+      toast.info(`Parsing presentation ${file.name}...`);
       const parsedSlides = await parsePowerPoint(file);
-      setSlides(parsedSlides);
-      setActiveSlideIndex(0);
-      setDocName(file.name);
-      setIsSaved(true);
-      toast.success(`Imported presentation "${file.name}" with ${parsedSlides.length} slides!`);
-    } catch (err: any) {
-      console.error('PPT import error:', err);
-      toast.error(`Failed to import PPT: ${err?.message || 'Unknown error'}`);
+      if (parsedSlides.length > 0) {
+        setSlides(
+          parsedSlides.map((s) => ({
+            ...s,
+            theme: (s.theme as PowerPointTheme) || 'indigo',
+            layout: 'content',
+          }))
+        );
+        setActiveSlideIndex(0);
+        setDocName(file.name);
+        setIsSaved(true);
+        toast.success(`Imported presentation with ${parsedSlides.length} slides!`);
+      }
+    } catch {
+      toast.error('Failed to import presentation');
     }
   };
 
   const handleGenerateAIDeck = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiPrompt) return;
+    if (!aiPrompt.trim()) return;
     setIsGenerating(true);
+
     setTimeout(() => {
-      const generatedSlides: Slide[] = [
+      const generated: Slide[] = [
         {
-          id: `ai_${Date.now()}_1`,
+          id: `gen_1_${Date.now()}`,
           title: aiPrompt,
-          subtitle: 'Executive Presentation generated by DocuFlow AI Copilot',
-          bullets: [
-            'Comprehensive strategic briefing and operational execution plan',
-            'Cross-functional milestone alignment across engineering and marketing',
-            'Risk mitigation strategies and measurable ROI deliverables',
-          ],
+          subtitle: 'Executive Presentation & Strategic Roadmap',
+          bullets: ['Market Overview & Executive Summary', 'Value Proposition & Technical Architecture', 'Timeline & Next Steps'],
           theme: 'indigo',
+          layout: 'title',
         },
         {
-          id: `ai_${Date.now()}_2`,
-          title: 'Key Objectives & Timeline',
-          subtitle: 'Q1 - Q4 Strategic Roadmap',
-          bullets: [
-            'Phase 1: Architecture stabilization and beta launch',
-            'Phase 2: Enterprise customer onboarding and SLA monitoring',
-            'Phase 3: Global expansion and partner ecosystem integration',
-          ],
+          id: `gen_2_${Date.now()}`,
+          title: 'Core Advantages & Metrics',
+          subtitle: 'Key Deliverables and Performance Indicators',
+          bullets: ['99.99% Reliability across all regions', 'Zero friction cross-platform deployment', 'Direct Google Drive and Cloud integration'],
           theme: 'emerald',
+          layout: 'stat',
+          statNumber: '10x Faster',
+          statLabel: 'Deployment & Collaboration Cycle',
+        },
+        {
+          id: `gen_3_${Date.now()}`,
+          title: 'Action Plan & Milestones',
+          subtitle: 'Q3 & Q4 Execution Phasing',
+          bullets: ['Phase 1: Architecture validation & security audit', 'Phase 2: Global pilot rollout', 'Phase 3: Full enterprise scale-up'],
+          theme: 'cyber',
+          layout: 'two_column',
         },
       ];
-      setSlides([...slides, ...generatedSlides]);
+      setSlides(generated);
+      setActiveSlideIndex(0);
       setIsGenerating(false);
       setShowAIDeckModal(false);
       setAiPrompt('');
       setIsSaved(true);
       toast.success('Generated presentation slides with AI!');
-    }, 1500);
+    }, 1200);
   };
 
-  // Color Theme Palettes
-  const themeStyles = {
+  // 8 Color Themes
+  const themeStyles: Record<PowerPointTheme, string> = {
     slate: 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white',
     indigo: 'bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white',
     emerald: 'bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-950 text-white',
     amber: 'bg-gradient-to-br from-slate-900 via-amber-950 to-slate-950 text-white',
     crimson: 'bg-gradient-to-br from-slate-900 via-rose-950 to-slate-950 text-white',
+    cyber: 'bg-gradient-to-br from-cyan-950 via-slate-900 to-purple-950 text-cyan-100 border border-cyan-500/20',
+    quartz: 'bg-gradient-to-br from-slate-100 via-white to-blue-50 text-slate-900 border border-slate-200',
+    midnight: 'bg-gradient-to-br from-black via-zinc-950 to-amber-950/40 text-amber-100 border border-amber-500/20',
   };
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] rounded-3xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl">
-      {/* Hidden Image Picker */}
-      <input
-        type="file"
-        ref={imageInputRef}
-        accept="image/*"
-        onChange={(e) => handleAddImage(e.target.files)}
-        className="hidden"
-      />
-
-      {/* Hidden PPT File Picker */}
-      <input
-        type="file"
-        ref={pptFileInputRef}
-        accept=".pptx,.ppt"
-        onChange={(e) => handleImportPPT(e.target.files)}
-        className="hidden"
-      />
+      {/* Hidden File Pickers */}
+      <input type="file" ref={imageInputRef} accept="image/*" onChange={(e) => handleAddImage(e.target.files)} className="hidden" />
+      <input type="file" ref={pptFileInputRef} accept=".pptx,.ppt" onChange={(e) => handleImportPPT(e.target.files)} className="hidden" />
 
       {/* MS PowerPoint Top Bar */}
       <div className="flex items-center justify-between px-3 sm:px-5 py-2 bg-[#d24726] dark:bg-[#a13217] text-white shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="p-1 rounded bg-white/10 flex items-center justify-center font-bold text-xs">
+          <div className="p-1.5 rounded-lg bg-white/15 flex items-center justify-center font-bold text-xs shadow-xs">
             <Presentation className="w-4 h-4 text-white" />
           </div>
           <input
@@ -256,11 +307,11 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleAddSlide}
-            className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
-            leftIcon={<FilePlus className="w-3.5 h-3.5" />}
+            onClick={() => setShowLayoutModal(true)}
+            className="text-white hover:bg-white/10 text-xs px-2 sm:px-3 bg-white/10"
+            leftIcon={<FilePlus className="w-3.5 h-3.5 text-amber-200" />}
           >
-            <span className="hidden sm:inline">New Slide</span>
+            <span className="hidden sm:inline">+ New Slide</span>
           </Button>
 
           <Button
@@ -290,7 +341,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
             variant="ghost"
             size="sm"
             onClick={() => setIsPlayingShow(true)}
-            className="text-white hover:bg-white/10 text-xs px-2 sm:px-3 bg-white/10"
+            className="text-white hover:bg-white/10 text-xs px-2 sm:px-3 bg-white/10 font-bold"
             leftIcon={<Play className="w-3.5 h-3.5 text-amber-200 fill-amber-200" />}
           >
             <span>Present</span>
@@ -328,10 +379,10 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
       <div className="flex items-center gap-1 px-2 sm:px-4 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto select-none">
         {[
           { id: 'home', label: 'Home' },
-          { id: 'insert', label: 'Insert' },
-          { id: 'design', label: 'Design & Themes' },
+          { id: 'insert', label: 'Insert & Elements' },
+          { id: 'design', label: '8 Pro Themes' },
           { id: 'slideshow', label: 'Slide Show' },
-          { id: 'ai', label: 'AI Deck' },
+          { id: 'ai', label: 'AI Deck Builder' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -352,11 +403,17 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
         {/* TAB 1: HOME */}
         {activeRibbonTab === 'home' && (
           <div className="flex items-center gap-2 min-w-max text-xs">
-            <Button variant="outline" size="sm" leftIcon={<Plus className="w-3.5 h-3.5 text-rose-500" />} onClick={handleAddSlide}>
+            <Button variant="outline" size="sm" leftIcon={<Plus className="w-3.5 h-3.5 text-rose-500" />} onClick={() => handleAddSlide('content')}>
               New Slide
             </Button>
             <Button variant="outline" size="sm" leftIcon={<Copy className="w-3.5 h-3.5" />} onClick={() => handleDuplicateSlide(activeSlideIndex)}>
-              Duplicate Slide
+              Duplicate
+            </Button>
+            <Button variant="outline" size="sm" leftIcon={<ArrowUp className="w-3.5 h-3.5" />} onClick={() => handleMoveSlideUp(activeSlideIndex)}>
+              Move Up
+            </Button>
+            <Button variant="outline" size="sm" leftIcon={<ArrowDown className="w-3.5 h-3.5" />} onClick={() => handleMoveSlideDown(activeSlideIndex)}>
+              Move Down
             </Button>
             <Button variant="ghost" size="sm" leftIcon={<Trash2 className="w-3.5 h-3.5 text-rose-500" />} onClick={() => handleDeleteSlide(activeSlideIndex)}>
               Delete Slide
@@ -367,44 +424,59 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
         {/* TAB 2: INSERT */}
         {activeRibbonTab === 'insert' && (
           <div className="flex items-center gap-2 min-w-max text-xs">
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<ImageIcon className="w-4 h-4 text-emerald-500" />}
-              onClick={() => imageInputRef.current?.click()}
-            >
-              Insert Picture
+            <Button variant="outline" size="sm" leftIcon={<ImageIcon className="w-4 h-4 text-emerald-500" />} onClick={() => imageInputRef.current?.click()}>
+              Picture
             </Button>
             <Button
               variant="outline"
               size="sm"
-              leftIcon={<Shapes className="w-4 h-4 text-indigo-500" />}
+              leftIcon={<TrendingUp className="w-4 h-4 text-amber-500" />}
               onClick={() => {
-                const currentBullets = activeSlide.bullets;
-                handleUpdateSlide({ bullets: [...currentBullets, 'New Key Takeaway Box'] });
-                toast.success('Inserted content box');
+                handleUpdateSlide({
+                  layout: 'stat',
+                  statNumber: '+120% YoY',
+                  statLabel: 'Enterprise Milestone Goal',
+                });
+                toast.success('Inserted Metric KPI Card');
               }}
             >
-              Add Bullet Box
+              KPI Stat Card
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Quote className="w-4 h-4 text-purple-500" />}
+              onClick={() => {
+                handleUpdateSlide({
+                  layout: 'quote',
+                  quoteAuthor: 'Executive Partner',
+                });
+                toast.success('Inserted Quote Block');
+              }}
+            >
+              Quote Block
             </Button>
           </div>
         )}
 
-        {/* TAB 3: DESIGN */}
+        {/* TAB 3: 8 PRO THEMES */}
         {activeRibbonTab === 'design' && (
           <div className="flex items-center gap-2 min-w-max text-xs">
-            <span className="text-slate-500 font-semibold pr-2">Theme:</span>
+            <span className="text-slate-500 font-semibold pr-2">Choose Theme:</span>
             {[
               { id: 'indigo', label: 'Royal Indigo', color: 'bg-indigo-600' },
-              { id: 'emerald', label: 'Emerald Green', color: 'bg-emerald-600' },
-              { id: 'amber', label: 'Warm Amber', color: 'bg-amber-600' },
-              { id: 'crimson', label: 'Crimson Red', color: 'bg-rose-600' },
-              { id: 'slate', label: 'Dark Slate', color: 'bg-slate-800' },
+              { id: 'emerald', label: 'Emerald Forest', color: 'bg-emerald-600' },
+              { id: 'cyber', label: 'Cyber Neon', color: 'bg-cyan-500' },
+              { id: 'quartz', label: 'Quartz Light', color: 'bg-blue-300' },
+              { id: 'midnight', label: 'Midnight Gold', color: 'bg-amber-600' },
+              { id: 'amber', label: 'Warm Amber', color: 'bg-amber-500' },
+              { id: 'crimson', label: 'Ruby Crimson', color: 'bg-rose-600' },
+              { id: 'slate', label: 'Titanium Slate', color: 'bg-slate-800' },
             ].map((t) => (
               <button
                 key={t.id}
                 onClick={() => handleUpdateSlide({ theme: t.id as any })}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold ${
                   activeSlide.theme === t.id ? 'bg-slate-900 text-white ring-2 ring-brand-500' : 'bg-slate-100 dark:bg-slate-800'
                 }`}
               >
@@ -419,7 +491,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
         {activeRibbonTab === 'slideshow' && (
           <div className="flex items-center gap-2 min-w-max text-xs">
             <Button variant="primary" size="sm" leftIcon={<Play className="w-3.5 h-3.5" />} onClick={() => setIsPlayingShow(true)}>
-              Start From Beginning
+              Play Fullscreen Show
             </Button>
           </div>
         )}
@@ -428,7 +500,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
         {activeRibbonTab === 'ai' && (
           <div className="flex items-center gap-2 min-w-max text-xs">
             <Button variant="gradient" size="sm" leftIcon={<Sparkles className="w-3.5 h-3.5" />} onClick={() => setShowAIDeckModal(true)}>
-              Generate AI Presentation
+              Generate AI Slide Deck
             </Button>
           </div>
         )}
@@ -438,8 +510,11 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
       <div className="flex-1 flex overflow-hidden">
         {/* Left Slide Thumbnails Pane */}
         <div className="w-48 sm:w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto p-3 space-y-3">
-          <div className="text-[10px] font-bold text-slate-400 uppercase px-1">
-            Slides ({slides.length})
+          <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase px-1">
+            <span>Slides ({slides.length})</span>
+            <button onClick={() => setShowLayoutModal(true)} className="text-[#d24726] hover:underline">
+              + New
+            </button>
           </div>
 
           {slides.map((s, i) => (
@@ -448,7 +523,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
               onClick={() => setActiveSlideIndex(i)}
               className={`p-2.5 rounded-2xl border transition-all cursor-pointer text-left ${
                 activeSlideIndex === i
-                  ? 'border-[#d24726] bg-rose-50/40 dark:bg-rose-950/30 ring-1 ring-[#d24726]'
+                  ? 'border-[#d24726] bg-rose-50/40 dark:bg-rose-950/30 ring-2 ring-[#d24726]'
                   : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
               }`}
             >
@@ -456,19 +531,11 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
                 <span>Slide {i + 1}</span>
                 <span className="capitalize">{s.theme}</span>
               </div>
-              <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                {s.title}
-              </div>
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{s.title}</div>
             </div>
           ))}
 
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<Plus className="w-4 h-4" />}
-            onClick={handleAddSlide}
-            className="w-full text-xs"
-          >
+          <Button variant="outline" size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowLayoutModal(true)} className="w-full text-xs">
             Add Slide
           </Button>
         </div>
@@ -482,53 +549,85 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
                 type="text"
                 value={activeSlide.title}
                 onChange={(e) => handleUpdateSlide({ title: e.target.value })}
-                className="w-full text-2xl sm:text-3xl font-extrabold bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:outline-none text-white tracking-tight"
+                className="w-full text-2xl sm:text-3xl font-extrabold bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:outline-none tracking-tight"
                 placeholder="Click to add presentation title..."
               />
               <input
                 type="text"
                 value={activeSlide.subtitle || ''}
                 onChange={(e) => handleUpdateSlide({ subtitle: e.target.value })}
-                className="w-full text-sm sm:text-base font-medium text-slate-300 bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:outline-none"
+                className="w-full text-sm sm:text-base font-medium opacity-80 bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:outline-none"
                 placeholder="Click to add subtitle..."
               />
             </div>
 
-            {/* Bullets & Image Split Area */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4">
-              <div className="space-y-3">
-                {activeSlide.bullets.map((bullet, bIdx) => (
-                  <div key={bIdx} className="flex items-start gap-2">
-                    <span className="text-brand-400 font-bold text-lg mt-0.5">•</span>
-                    <input
-                      type="text"
-                      value={bullet}
-                      onChange={(e) => {
-                        const newBullets = [...activeSlide.bullets];
-                        newBullets[bIdx] = e.target.value;
-                        handleUpdateSlide({ bullets: newBullets });
-                      }}
-                      className="w-full text-xs sm:text-sm bg-transparent border-b border-transparent hover:border-white/20 focus:border-white/60 focus:outline-none text-slate-200"
-                    />
-                  </div>
-                ))}
+            {/* Special Layout Rendering: Stat / Quote / Bullets */}
+            {activeSlide.layout === 'stat' ? (
+              <div className="my-6 p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-center space-y-2">
+                <input
+                  type="text"
+                  value={activeSlide.statNumber || '+350%'}
+                  onChange={(e) => handleUpdateSlide({ statNumber: e.target.value })}
+                  className="w-full text-center text-4xl sm:text-5xl font-black bg-transparent border-none focus:outline-none"
+                />
+                <input
+                  type="text"
+                  value={activeSlide.statLabel || 'Key Growth Performance'}
+                  onChange={(e) => handleUpdateSlide({ statLabel: e.target.value })}
+                  className="w-full text-center text-xs sm:text-sm font-semibold opacity-80 bg-transparent border-none focus:outline-none"
+                />
               </div>
-
-              {activeSlide.imageUrl && (
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 max-h-48">
-                  <img src={activeSlide.imageUrl} alt="Slide Visual" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => handleUpdateSlide({ imageUrl: undefined })}
-                    className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white hover:bg-black"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+            ) : activeSlide.layout === 'quote' ? (
+              <div className="my-6 p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 italic space-y-3">
+                <textarea
+                  rows={2}
+                  value={activeSlide.bullets[0] || 'Empowering seamless document transformation across the entire enterprise.'}
+                  onChange={(e) => handleUpdateSlide({ bullets: [e.target.value] })}
+                  className="w-full text-base sm:text-xl font-serif bg-transparent border-none focus:outline-none leading-relaxed"
+                />
+                <input
+                  type="text"
+                  value={activeSlide.quoteAuthor || '— Executive Leadership'}
+                  onChange={(e) => handleUpdateSlide({ quoteAuthor: e.target.value })}
+                  className="w-full text-right text-xs font-sans font-bold opacity-80 bg-transparent border-none focus:outline-none"
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4">
+                <div className="space-y-3">
+                  {activeSlide.bullets.map((bullet, bIdx) => (
+                    <div key={bIdx} className="flex items-start gap-2">
+                      <span className="font-bold text-lg mt-0.5">•</span>
+                      <input
+                        type="text"
+                        value={bullet}
+                        onChange={(e) => {
+                          const newBullets = [...activeSlide.bullets];
+                          newBullets[bIdx] = e.target.value;
+                          handleUpdateSlide({ bullets: newBullets });
+                        }}
+                        className="w-full text-xs sm:text-sm bg-transparent border-b border-transparent hover:border-white/20 focus:border-white/60 focus:outline-none"
+                      />
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+
+                {activeSlide.imageUrl && (
+                  <div className="relative rounded-2xl overflow-hidden border border-white/10 max-h-48">
+                    <img src={activeSlide.imageUrl} alt="Slide Visual" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => handleUpdateSlide({ imageUrl: undefined })}
+                      className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white hover:bg-black"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Footer */}
-            <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-white/10 pt-3">
+            <div className="flex items-center justify-between text-[11px] opacity-70 border-t border-white/10 pt-3">
               <span>DocuFlow AI Presentation Suite</span>
               <span>Slide {activeSlideIndex + 1} of {slides.length}</span>
             </div>
@@ -600,6 +699,28 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
           </div>
         </div>
       )}
+
+      {/* Slide Layout Chooser Modal */}
+      <Modal isOpen={showLayoutModal} onClose={() => setShowLayoutModal(false)} title="Choose Slide Layout">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-2">
+          {[
+            { layout: 'title', label: 'Title Slide', desc: 'Main presentation cover' },
+            { layout: 'content', label: 'Title & Bullets', desc: 'Standard key points' },
+            { layout: 'two_column', label: 'Two Column Split', desc: 'Comparison & analysis' },
+            { layout: 'stat', label: 'Big Metric KPI', desc: 'High impact statistic' },
+            { layout: 'quote', label: 'Quote Callout', desc: 'Executive testimonial' },
+          ].map((l) => (
+            <div
+              key={l.layout}
+              onClick={() => handleAddSlide(l.layout as SlideLayout)}
+              className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-[#d24726] hover:bg-rose-50/30 dark:hover:bg-rose-950/30 cursor-pointer transition-all text-left"
+            >
+              <div className="text-xs font-bold text-slate-900 dark:text-white">{l.label}</div>
+              <div className="text-[11px] text-slate-400 mt-1">{l.desc}</div>
+            </div>
+          ))}
+        </div>
+      </Modal>
 
       {/* AI Deck Prompt Modal */}
       <Modal

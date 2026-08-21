@@ -134,8 +134,8 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
   };
 
   const handleAddRow = () => {
-    const newRow = new Array(headers.length).fill('0');
-    newRow[0] = `New Row ${gridData.length + 1}`;
+    const newRow = new Array(headers.length).fill('');
+    newRow[0] = `Item ${gridData.length + 1}`;
     setGridData([...gridData, newRow]);
     setIsSaved(false);
     toast.success('Added row to worksheet');
@@ -145,9 +145,91 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
     const colLetter = String.fromCharCode(65 + headers.length);
     const newColName = `Column ${colLetter}`;
     setHeaders([...headers, newColName]);
-    setGridData(gridData.map((row) => [...row, '0']));
+    setGridData(gridData.map((row) => [...row, '']));
     setIsSaved(false);
     toast.success(`Added ${newColName}`);
+  };
+
+  const handleDeleteSelectedRow = () => {
+    if (gridData.length <= 1) {
+      toast.error('Cannot delete the only row');
+      return;
+    }
+    const targetRowIdx = selectedCell.r;
+    setGridData(gridData.filter((_, i) => i !== targetRowIdx));
+    setSelectedCell((prev) => ({ ...prev, r: Math.max(0, prev.r - 1) }));
+    setIsSaved(false);
+    toast.success(`Deleted Row ${targetRowIdx + 1}`);
+  };
+
+  const handleCopyRow = () => {
+    const row = gridData[selectedCell.r];
+    if (!row) return;
+    const rowText = row.join('\t');
+    navigator.clipboard.writeText(rowText);
+    toast.success(`Copied Row ${selectedCell.r + 1} to clipboard!`);
+  };
+
+  const handleDuplicateRow = () => {
+    const row = gridData[selectedCell.r];
+    if (!row) return;
+    const newRows = [...gridData.slice(0, selectedCell.r + 1), [...row], ...gridData.slice(selectedCell.r + 1)];
+    setGridData(newRows);
+    setIsSaved(false);
+    toast.success(`Duplicated Row ${selectedCell.r + 1}`);
+  };
+
+  const handleClearRow = () => {
+    const updated = [...gridData];
+    updated[selectedCell.r] = new Array(headers.length).fill('');
+    setGridData(updated);
+    setIsSaved(false);
+    toast.success(`Cleared Row ${selectedCell.r + 1}`);
+  };
+
+  const handleDeleteSelectedColumn = () => {
+    if (headers.length <= 1) {
+      toast.error('Cannot delete the only column');
+      return;
+    }
+    const targetColIdx = selectedCell.c;
+    setHeaders(headers.filter((_, i) => i !== targetColIdx));
+    setGridData(gridData.map((row) => row.filter((_, i) => i !== targetColIdx)));
+    setSelectedCell((prev) => ({ ...prev, c: Math.max(0, prev.c - 1) }));
+    setIsSaved(false);
+    toast.success(`Deleted Column ${String.fromCharCode(65 + targetColIdx)}`);
+  };
+
+  const handleCopyColumn = () => {
+    const colValues = [headers[selectedCell.c], ...gridData.map((r) => r[selectedCell.c] || '')];
+    navigator.clipboard.writeText(colValues.join('\n'));
+    toast.success(`Copied Column ${String.fromCharCode(65 + selectedCell.c)} to clipboard!`);
+  };
+
+  const handleClearColumn = () => {
+    const targetColIdx = selectedCell.c;
+    setGridData(
+      gridData.map((row) => {
+        const copy = [...row];
+        copy[targetColIdx] = '';
+        return copy;
+      })
+    );
+    setIsSaved(false);
+    toast.success(`Cleared Column ${String.fromCharCode(65 + targetColIdx)}`);
+  };
+
+  const handleClearAllData = () => {
+    setGridData(gridData.map(() => new Array(headers.length).fill('')));
+    setFormulaValue('');
+    setIsSaved(false);
+    toast.success('Cleared all spreadsheet data!');
+  };
+
+  const handleCopyAllTable = () => {
+    const tableText = [headers.join('\t'), ...gridData.map((r) => r.join('\t'))].join('\n');
+    navigator.clipboard.writeText(tableText);
+    toast.success('Copied entire spreadsheet table to clipboard!');
   };
 
   const handleDeleteRow = () => {
@@ -381,15 +463,42 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
         {/* TAB 1: HOME */}
         {activeRibbonTab === 'home' && (
           <div className="flex items-center gap-2 min-w-max text-xs">
+            {/* Table Bulk Tools */}
+            <div className="flex items-center gap-1 pr-2 border-r border-slate-200 dark:border-slate-800">
+              <Button variant="outline" size="sm" onClick={handleCopyAllTable} title="Copy entire table to clipboard">
+                📋 Copy All
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleClearAllData} className="text-rose-500 hover:text-rose-600" title="Clear all cell values">
+                🗑️ Clear All
+              </Button>
+            </div>
+
+            {/* Row Controls */}
             <div className="flex items-center gap-1 pr-2 border-r border-slate-200 dark:border-slate-800">
               <Button variant="outline" size="sm" leftIcon={<ArrowDown className="w-3.5 h-3.5 text-emerald-500" />} onClick={handleAddRow}>
                 + Row
               </Button>
-              <Button variant="outline" size="sm" leftIcon={<ArrowRight className="w-3.5 h-3.5 text-emerald-500" />} onClick={handleAddColumn}>
-                + Column
+              <Button variant="outline" size="sm" onClick={handleCopyRow} title="Copy selected row">
+                Copy Row
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleDeleteRow} className="text-rose-500">
+              <Button variant="outline" size="sm" onClick={handleDuplicateRow} title="Duplicate selected row">
+                Dup Row
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleDeleteSelectedRow} className="text-rose-500" title="Delete selected row">
                 - Row
+              </Button>
+            </div>
+
+            {/* Column Controls */}
+            <div className="flex items-center gap-1 pr-2 border-r border-slate-200 dark:border-slate-800">
+              <Button variant="outline" size="sm" leftIcon={<ArrowRight className="w-3.5 h-3.5 text-emerald-500" />} onClick={handleAddColumn}>
+                + Col
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleCopyColumn} title="Copy selected column">
+                Copy Col
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleDeleteSelectedColumn} className="text-rose-500" title="Delete selected column">
+                - Col
               </Button>
             </div>
 

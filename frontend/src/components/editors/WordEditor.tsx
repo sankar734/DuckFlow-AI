@@ -58,7 +58,7 @@ import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
 import { exportElementToPDF } from '../../utils/pdfGenerator';
-import { parseWordDocument } from '../../utils/documentParsers';
+import { parseWordDocument, splitHtmlIntoPages } from '../../utils/documentParsers';
 import { uploadToGoogleDrive } from '../../utils/googleDriveSync';
 import { toast } from 'sonner';
 
@@ -134,15 +134,27 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   useEffect(() => {
     const draft = localStorage.getItem('docuflow_active_draft');
     if (draft) {
-      setPages([
-        { id: 'page_1', content: draft, headerText: 'DocuFlow AI Synthesized Draft', footerText: 'Page 1' },
-      ]);
+      const pageList = splitHtmlIntoPages(draft);
+      setPages(
+        pageList.map((content, idx) => ({
+          id: `page_draft_${idx + 1}`,
+          content,
+          headerText: 'DocuFlow AI Synthesized Draft',
+          footerText: `Page ${idx + 1}`,
+        }))
+      );
       localStorage.removeItem('docuflow_active_draft');
-      toast.success('Loaded AI synthesized content into Word Editor!');
+      toast.success(`Loaded AI content across ${pageList.length} pages!`);
     } else if (initialContent) {
-      setPages([
-        { id: 'page_1', content: initialContent, headerText: docName, footerText: 'Page 1' },
-      ]);
+      const pageList = splitHtmlIntoPages(initialContent);
+      setPages(
+        pageList.map((content, idx) => ({
+          id: `page_init_${idx + 1}`,
+          content,
+          headerText: docName,
+          footerText: `Page ${idx + 1}`,
+        }))
+      );
     }
     updateStats();
   }, []);
@@ -205,12 +217,18 @@ export const WordEditor: React.FC<WordEditorProps> = ({
     try {
       const parsed = await parseWordDocument(file);
       setDocName(file.name);
-      setPages([
-        { id: 'page_1', content: parsed.html, headerText: file.name, footerText: 'Page 1' },
-      ]);
+      const pageList = parsed.pages && parsed.pages.length > 0 ? parsed.pages : [parsed.html];
+      setPages(
+        pageList.map((content, idx) => ({
+          id: `page_${Date.now()}_${idx + 1}`,
+          content,
+          headerText: file.name,
+          footerText: `Page ${idx + 1} of ${pageList.length}`,
+        }))
+      );
       setIsSaved(true);
       updateStats();
-      toast.success(`Imported "${file.name}" with lossless rendering!`);
+      toast.success(`Imported "${file.name}" with ${pageList.length} discrete pages & lossless layout!`);
     } catch {
       toast.error('Failed to import document file');
     }
