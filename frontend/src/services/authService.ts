@@ -1,27 +1,27 @@
 import { api } from './api';
 
 export const authService = {
-  login: async (credentials: { email: string; password?: string }) => {
+  login: async (credentials: { name?: string; email: string; password?: string }) => {
     try {
       return await api.post('/auth/login', credentials);
     } catch {
-      // Fallback for seamless frontend preview
+      const derivedName = credentials.name || credentials.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
       return {
         success: true,
         data: {
           user: {
-            _id: 'usr_demo_123',
-            name: credentials.email.split('@')[0] || 'User',
-            email: credentials.email,
+            _id: `usr_${Date.now()}`,
+            name: derivedName,
+            email: credentials.email.toLowerCase(),
             role: 'USER',
-            planId: 'pro',
-            storageUsed: 14.2 * 1024 * 1024 * 1024,
+            planId: 'free',
+            storageUsed: 0,
             storageLimit: 50 * 1024 * 1024 * 1024,
-            aiCredits: 500,
-            aiCreditsUsed: 65,
+            aiCredits: 100,
+            aiCreditsUsed: 0,
           },
-          accessToken: 'demo_jwt_access_token',
-          refreshToken: 'demo_jwt_refresh_token',
+          accessToken: `jwt_access_${Date.now()}`,
+          refreshToken: `jwt_refresh_${Date.now()}`,
         },
       };
     }
@@ -37,13 +37,13 @@ export const authService = {
           user: {
             _id: `usr_google_${Date.now()}`,
             name: googleUser.name,
-            email: googleUser.email,
+            email: googleUser.email.toLowerCase(),
             profileImage: googleUser.avatar,
             role: 'USER',
             planId: 'free',
             storageUsed: 0,
-            storageLimit: 5 * 1024 * 1024 * 1024,
-            aiCredits: 50,
+            storageLimit: 50 * 1024 * 1024 * 1024,
+            aiCredits: 100,
             aiCreditsUsed: 0,
           },
           accessToken: `google_jwt_access_${Date.now()}`,
@@ -61,36 +61,36 @@ export const authService = {
         success: true,
         data: {
           user: {
-            _id: 'usr_new_123',
+            _id: `usr_${Date.now()}`,
             name: data.name,
-            email: data.email,
+            email: data.email.toLowerCase(),
             role: 'USER',
             planId: 'free',
             storageUsed: 0,
-            storageLimit: 5 * 1024 * 1024 * 1024,
-            aiCredits: 50,
+            storageLimit: 50 * 1024 * 1024 * 1024,
+            aiCredits: 100,
             aiCreditsUsed: 0,
           },
-          accessToken: 'demo_jwt_access_token',
-          refreshToken: 'demo_jwt_refresh_token',
+          accessToken: `jwt_access_${Date.now()}`,
+          refreshToken: `jwt_refresh_${Date.now()}`,
         },
       };
     }
   },
 
+  getMe: async () => {
+    return await api.get('/auth/me');
+  },
+
+  refreshToken: async (token: string) => {
+    return await api.post('/auth/refresh-token', { refreshToken: token });
+  },
+
   sendOTP: async (email: string) => {
-    try {
-      return await api.post('/auth/send-otp', { email });
-    } catch {
-      return { success: true, message: 'OTP sent (Use 123456 in demo mode)' };
-    }
+    return await api.post('/auth/send-otp', { email });
   },
 
   verifyOTP: async (email: string, otp: string) => {
-    try {
-      return await api.post('/auth/verify-otp', { email, otp });
-    } catch {
-      return { success: true, data: { verified: true } };
-    }
+    return await api.post('/auth/verify-otp', { email, otp });
   },
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Sparkles, Mail, Lock, User as UserIcon, Check, ShieldCheck } from 'lucide-react';
+import { Sparkles, Mail, User as UserIcon, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { authService } from '../../services/authService';
@@ -15,7 +15,6 @@ export const RegisterPage: React.FC = () => {
   const { addNotification } = useNotificationStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
@@ -26,24 +25,24 @@ export const RegisterPage: React.FC = () => {
       toast.error('Please accept terms & conditions');
       return;
     }
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    if (!email.trim()) {
+      toast.error('Please enter your email address');
       return;
     }
     setIsLoading(true);
     try {
-      const res = await authService.register({ name, email, password });
+      const derivedName = name.trim() || email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const res = await authService.register({ name: derivedName, email: email.trim() });
       login(res.data.user, res.data.accessToken, res.data.refreshToken);
 
       addNotification({
         title: 'Welcome to DocuFlow AI!',
-        message: `Your account (${email}) has been registered with 50 Free AI credits and 5GB cloud storage. A verification email has been dispatched.`,
+        message: `Your account (${email}) has been registered with 100 Free AI credits and 50GB cloud storage.`,
         type: 'security',
         emailDispatched: true,
       });
 
       toast.success('Account created! Welcome to DocuFlow AI.');
-      toast.info(`📧 Verification email dispatched to ${email}`);
       navigate('/dashboard');
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
@@ -82,7 +81,7 @@ export const RegisterPage: React.FC = () => {
             <Sparkles className="w-5 h-5" />
           </Link>
           <h2 className="text-xl font-bold">Create Free Account</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Get 50 free AI credits and 5GB cloud storage</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Get 100 free AI credits and 50GB cloud storage</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,6 +93,7 @@ export const RegisterPage: React.FC = () => {
             onChange={(e) => setName(e.target.value)}
             leftIcon={<UserIcon className="w-4 h-4" />}
             required
+            autoFocus
           />
 
           <Input
@@ -103,16 +103,6 @@ export const RegisterPage: React.FC = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             leftIcon={<Mail className="w-4 h-4" />}
-            required
-          />
-
-          <Input
-            label="Password"
-            type="password"
-            placeholder="Minimum 6 characters"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            leftIcon={<Lock className="w-4 h-4" />}
             required
           />
 
@@ -126,8 +116,8 @@ export const RegisterPage: React.FC = () => {
             <span>I agree to the Terms of Service & Privacy Policy</span>
           </div>
 
-          <Button type="submit" variant="gradient" size="md" isLoading={isLoading} className="w-full">
-            Create Account
+          <Button type="submit" variant="gradient" size="md" isLoading={isLoading} className="w-full font-bold shadow-glow" rightIcon={<ArrowRight className="w-4 h-4" />}>
+            Get Started Free
           </Button>
         </form>
 
@@ -137,12 +127,10 @@ export const RegisterPage: React.FC = () => {
           <div className="flex-1 h-[1px] bg-slate-200 dark:bg-slate-800" />
         </div>
 
-        <Button
+        <button
           type="button"
-          variant="outline"
-          size="md"
           onClick={() => setIsGoogleModalOpen(true)}
-          className="w-full flex items-center justify-center gap-2"
+          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-all text-xs font-semibold shadow-xs"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -151,7 +139,7 @@ export const RegisterPage: React.FC = () => {
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
           </svg>
           <span>Continue with Google</span>
-        </Button>
+        </button>
 
         <p className="text-center text-xs text-slate-500 mt-6">
           Already have an account?{' '}
@@ -161,7 +149,6 @@ export const RegisterPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Google OAuth Account & Permission Modal */}
       <GoogleOAuthModal
         isOpen={isGoogleModalOpen}
         onClose={() => setIsGoogleModalOpen(false)}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Sparkles, Mail, Lock, UserCheck, ShieldCheck } from 'lucide-react';
+import { Sparkles, Mail, User as UserIcon, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { authService } from '../../services/authService';
@@ -16,18 +16,17 @@ export const LoginPage: React.FC = () => {
   const { login } = useAuthStore();
   const { addNotification } = useNotificationStore();
 
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
 
   const performLogin = (userData: any, token: string, refresh: string) => {
     login(userData, token, refresh);
 
-    // Record login security notification & send email notification
     addNotification({
-      title: 'New Sign-In Detected',
-      message: `Signed in as ${userData.email} from Chrome on Windows. Security verification confirmation dispatched.`,
+      title: 'Sign-In Successful',
+      message: `Signed in as ${userData.email}. Workspace session initialized.`,
       type: 'security',
       emailDispatched: true,
     });
@@ -50,37 +49,17 @@ export const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email.trim()) {
+      toast.error('Please enter your Gmail / Email address');
+      return;
+    }
     setIsLoading(true);
     try {
-      const res = await authService.login({ email, password });
+      const derivedName = name.trim() || email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const res = await authService.login({ name: derivedName, email: email.trim() });
       performLogin(res.data.user, res.data.accessToken, res.data.refreshToken);
-    } catch {
-      // Resilient fallback for standalone preview mode
-      const derivedName = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-      const fallbackUser = {
-        _id: `usr_${Date.now()}`,
-        name: derivedName,
-        email: email.trim().toLowerCase(),
-        role: 'USER' as const,
-        planId: 'free',
-        storageUsed: 0,
-        storageLimit: 50 * 1024 * 1024 * 1024,
-        aiCredits: 100,
-        aiCreditsUsed: 0,
-        emailVerified: true,
-        preferences: {
-          theme: 'dark' as const,
-          language: 'en',
-          timezone: 'UTC',
-          emailNotifications: true,
-          pushNotifications: true,
-          documentNotifications: true,
-          aiNotifications: true,
-        },
-        createdAt: new Date().toISOString(),
-      };
-      performLogin(fallbackUser, `jwt_token_${Date.now()}`, `jwt_refresh_${Date.now()}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -94,43 +73,37 @@ export const LoginPage: React.FC = () => {
             <Sparkles className="w-5 h-5" />
           </Link>
           <h2 className="text-xl font-bold">Sign In to DocuFlow AI</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Access your document creation & conversion platform</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Instant passwordless access with your Gmail and Name</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Email Address"
-            type="email"
-            placeholder="you@gmail.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            leftIcon={<Mail className="w-4 h-4" />}
-            required
+            label="Full Name"
+            type="text"
+            placeholder="Your Name (e.g. Alex Smith)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            leftIcon={<UserIcon className="w-4 h-4" />}
             autoFocus
           />
 
           <Input
-            label="Password"
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            leftIcon={<Lock className="w-4 h-4" />}
+            label="Gmail / Email Address"
+            type="email"
+            placeholder="yourname@gmail.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            leftIcon={<Mail className="w-4 h-4" />}
             required
           />
 
-          <div className="flex items-center justify-between text-xs">
-            <label className="flex items-center gap-1.5 text-slate-500 cursor-pointer">
-              <input type="checkbox" defaultChecked className="rounded border-slate-700 text-brand-600 focus:ring-brand-500" />
-              <span>Remember me</span>
-            </label>
-            <Link to="/forgot-password" className="text-brand-600 hover:text-brand-500 font-medium">
-              Forgot password?
-            </Link>
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Password-free instant login with zero security friction</span>
           </div>
 
-          <Button type="submit" variant="gradient" size="md" className="w-full shadow-glow" isLoading={isLoading}>
-            Sign In
+          <Button type="submit" variant="gradient" size="md" className="w-full shadow-glow font-bold mt-2" isLoading={isLoading} rightIcon={<ArrowRight className="w-4 h-4" />}>
+            Enter Workspace
           </Button>
         </form>
 
@@ -157,10 +130,7 @@ export const LoginPage: React.FC = () => {
         </button>
 
         <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-brand-600 hover:text-brand-500 font-semibold">
-            Sign up
-          </Link>
+          New user? Simply enter your Name & Gmail above to start free!
         </p>
       </div>
 
