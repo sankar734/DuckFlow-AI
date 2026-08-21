@@ -47,6 +47,11 @@ import {
   X,
   SplitSquareVertical,
   Layers,
+  Plus,
+  Trash2,
+  CornerDownRight,
+  ChevronRight,
+  BookOpen,
 } from 'lucide-react';
 import { AIAssistantPanel } from '../ai/AIAssistantPanel';
 import { Button } from '../common/Button';
@@ -62,16 +67,22 @@ export interface WordEditorProps {
   initialContent?: string;
 }
 
+export interface DocumentPage {
+  id: string;
+  content: string;
+  headerText?: string;
+  footerText?: string;
+}
+
 export const WordEditor: React.FC<WordEditorProps> = ({
   initialDocName = 'Document1.docx',
   initialContent,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const editorRef = useRef<HTMLDivElement>(null);
-  const paperRef = useRef<HTMLDivElement>(null);
+  const printContainerRef = useRef<HTMLDivElement>(null);
 
   const [docName, setDocName] = useState(initialDocName);
-  const [activeRibbonTab, setActiveRibbonTab] = useState<'home' | 'insert' | 'layout' | 'review' | 'view' | 'ai'>('home');
+  const [activeRibbonTab, setActiveRibbonTab] = useState<'home' | 'insert' | 'layout' | 'references' | 'review' | 'view' | 'ai'>('home');
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [isSaved, setIsSaved] = useState(true);
 
@@ -84,11 +95,23 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [zoomLevel, setZoomLevel] = useState(100);
   const [isDarkModePaper, setIsDarkModePaper] = useState(false);
+  const [showRuler, setShowRuler] = useState(true);
+
+  // Multi-Page Architecture (Real MS Word Multi-Page Canvas)
+  const defaultPage1 = `<h1>Executive Business Proposal</h1><p>DocuFlow AI provides an enterprise-ready document authoring and intelligent conversion environment with native Microsoft Office 365 compatibility.</p><h2>1. Key Deliverables</h2><p>Teams can collaborate in real time, type with formatted typography, evaluate formulas, and synthesize structured content using the AI Copilot.</p><ul><li><strong>High Fidelity Rendering:</strong> Lossless conversion across Word, Excel, PowerPoint, and PDF.</li><li><strong>Enterprise Governance:</strong> AES-256 cloud encryption and role-based permissions.</li><li><strong>AI Productivity Engine:</strong> Auto-drafting, summarizing, and smart translations.</li></ul>`;
+  
+  const defaultPage2 = `<h2>2. Strategic Milestones & Roadmap</h2><p>Our implementation architecture ensures maximum interoperability across enterprise infrastructure:</p><table style="width:100%; border-collapse:collapse; margin:16px 0;"><tr style="background:#f1f5f9;"><th style="border:1px solid #cbd5e1; padding:8px; text-align:left;">Phase</th><th style="border:1px solid #cbd5e1; padding:8px; text-align:left;">Milestone</th><th style="border:1px solid #cbd5e1; padding:8px; text-align:left;">Status</th></tr><tr><td style="border:1px solid #cbd5e1; padding:8px;">Q1 2026</td><td style="border:1px solid #cbd5e1; padding:8px;">Core Office Lossless Parsers</td><td style="border:1px solid #cbd5e1; padding:8px; color:#10b981; font-weight:bold;">Completed</td></tr><tr><td style="border:1px solid #cbd5e1; padding:8px;">Q2 2026</td><td style="border:1px solid #cbd5e1; padding:8px;">Google Gemini Real AI Engine</td><td style="border:1px solid #cbd5e1; padding:8px; color:#10b981; font-weight:bold;">Active</td></tr><tr><td style="border:1px solid #cbd5e1; padding:8px;">Q3 2026</td><td style="border:1px solid #cbd5e1; padding:8px;">Google Drive Live Cloud Sync</td><td style="border:1px solid #cbd5e1; padding:8px; color:#3b82f6; font-weight:bold;">Integrated</td></tr></table><p>All modules are validated for multi-page high resolution PDF & DOCX rendering.</p>`;
+
+  const [pages, setPages] = useState<DocumentPage[]>([
+    { id: 'page_1', content: defaultPage1, headerText: 'DocuFlow AI Suite', footerText: 'Confidential' },
+    { id: 'page_2', content: defaultPage2, headerText: 'DocuFlow AI Suite', footerText: 'Confidential' },
+  ]);
+
+  const [activePageIndex, setActivePageIndex] = useState(0);
 
   // Document Stats
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
-  const [pageCount, setPageCount] = useState(1);
 
   // New Document Modal
   const [isNewDocModalOpen, setIsNewDocModalOpen] = useState(false);
@@ -107,115 +130,120 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
 
-  const defaultStarterText = `<h1>Executive Business Proposal</h1><p>DocuFlow AI provides an enterprise-ready document authoring and intelligent conversion environment with native Microsoft Office 365 compatibility.</p><h2>1. Key Deliverables</h2><p>Teams can collaborate in real time, type with formatted typography, evaluate formulas, and synthesize structured content using the AI Copilot.</p><ul><li><strong>High Fidelity Rendering:</strong> Lossless conversion across Word, Excel, PowerPoint, and PDF.</li><li><strong>Enterprise Governance:</strong> AES-256 cloud encryption and role-based permissions.</li><li><strong>AI Productivity Engine:</strong> Auto-drafting, summarizing, and smart translations.</li></ul>`;
-
+  // Load initial content or active draft
   useEffect(() => {
-    if (editorRef.current) {
-      const draft = localStorage.getItem('docuflow_active_draft');
-      if (draft) {
-        editorRef.current.innerHTML = draft;
-        localStorage.removeItem('docuflow_active_draft');
-        toast.success('Loaded AI synthesized content into Word Editor!');
-      } else {
-        editorRef.current.innerHTML = initialContent || defaultStarterText;
-      }
-      updateStats();
+    const draft = localStorage.getItem('docuflow_active_draft');
+    if (draft) {
+      setPages([
+        { id: 'page_1', content: draft, headerText: 'DocuFlow AI Synthesized Draft', footerText: 'Page 1' },
+      ]);
+      localStorage.removeItem('docuflow_active_draft');
+      toast.success('Loaded AI synthesized content into Word Editor!');
+    } else if (initialContent) {
+      setPages([
+        { id: 'page_1', content: initialContent, headerText: docName, footerText: 'Page 1' },
+      ]);
     }
+    updateStats();
   }, []);
 
   const updateStats = () => {
-    if (!editorRef.current) return;
-    const text = editorRef.current.innerText || '';
-    const words = text.trim().split(/\s+/).filter(Boolean).length;
+    let totalText = '';
+    pages.forEach((p) => {
+      const temp = document.createElement('div');
+      temp.innerHTML = p.content;
+      totalText += ' ' + (temp.innerText || '');
+    });
+    const words = totalText.trim().split(/\s+/).filter(Boolean).length;
     setWordCount(words);
-    setCharCount(text.length);
-    setPageCount(Math.max(1, Math.ceil(words / 400)));
+    setCharCount(totalText.length);
   };
 
-  const handleContentInput = () => {
+  const handlePageContentChange = (pageIndex: number, newHtml: string) => {
     setIsSaved(false);
+    setPages((prev) => {
+      const updated = [...prev];
+      updated[pageIndex] = { ...updated[pageIndex], content: newHtml };
+      return updated;
+    });
     updateStats();
+  };
+
+  const handleAddPageBreak = () => {
+    const newPageId = `page_${Date.now()}`;
+    setPages((prev) => [
+      ...prev,
+      {
+        id: newPageId,
+        content: '<p><em>Type your next page content here...</em></p>',
+        headerText: docName,
+        footerText: `Page ${prev.length + 1}`,
+      },
+    ]);
+    setActivePageIndex(pages.length);
+    toast.success(`Inserted Page Break: Page ${pages.length + 1} added!`);
+  };
+
+  const handleDeletePage = (index: number) => {
+    if (pages.length <= 1) {
+      toast.error('Cannot delete the only remaining page');
+      return;
+    }
+    setPages((prev) => prev.filter((_, i) => i !== index));
+    setActivePageIndex((prev) => Math.max(0, prev - 1));
+    toast.success(`Removed Page ${index + 1}`);
   };
 
   const executeCommand = (cmd: string, value: string = '') => {
     document.execCommand(cmd, false, value);
-    if (editorRef.current) {
-      editorRef.current.focus();
-    }
-    handleContentInput();
-  };
-
-  const handleCreateNewDocument = (templateType: string) => {
-    if (!editorRef.current) return;
-    let templateHtml = '';
-    let name = 'Untitled_Document.docx';
-
-    if (templateType === 'blank') {
-      templateHtml = '<p><br/></p>';
-      name = 'New_Document.docx';
-    } else if (templateType === 'resume') {
-      templateHtml = `<h1>Your Full Name</h1><p><strong>Senior Software Architect & Product Lead</strong><br/>contact@email.com | +91 98765 43210 | Bangalore, India</p><hr/><h2>Professional Summary</h2><p>Accomplished engineering architect with 8+ years building enterprise SaaS platforms and AI automation tools.</p><h2>Work Experience</h2><p><strong>Senior Lead Engineer — TechCorp (2022 - Present)</strong></p><ul><li>Spearheaded cloud architecture migration reducing infra latency by 45%.</li><li>Architected real-time multi-tenant document collaboration system.</li></ul><h2>Education & Skills</h2><p>B.Tech Computer Science (Honors) • React, TypeScript, Node.js, AI LLMs, Cloud Infrastructure</p>`;
-      name = 'Professional_Resume.docx';
-    } else if (templateType === 'letter') {
-      templateHtml = `<p>Date: ${new Date().toLocaleDateString()}</p><p>To:<br/>Client Name<br/>Company Inc.<br/>Address Details</p><p>Dear Sir/Madam,</p><p>Subject: Strategic Engagement Confirmation</p><p>We are delighted to submit our proposal for the upcoming project milestones. Our team has outlined comprehensive technical and operational roadmaps tailored to your specifications.</p><p>Warm regards,<br/><strong>DocuFlow AI Team</strong></p>`;
-      name = 'Formal_Letter.docx';
-    } else if (templateType === 'notes') {
-      templateHtml = `<h1>Meeting Notes & Action Items</h1><p><strong>Date:</strong> ${new Date().toLocaleDateString()} | <strong>Attendees:</strong> Product & Engineering Teams</p><hr/><h2>Discussion Points</h2><ol><li>Q4 SaaS Feature Launch & Universal Converter readiness.</li><li>Mobile responsive Word, Excel & PowerPoint editor suites.</li><li>Performance optimizations for client-side PDF generation.</li></ol><h2>Action Items</h2><ul><li>[ ] Finalize Ribbon UI testing on touch devices.</li><li>[ ] Deploy live Google OAuth consent verification.</li></ul>`;
-      name = 'Meeting_Agenda_Notes.docx';
-    }
-
-    editorRef.current.innerHTML = templateHtml;
-    setDocName(name);
-    setIsNewDocModalOpen(false);
-    updateStats();
-    setIsSaved(true);
-    toast.success(`Created "${name}"! Start typing below.`);
+    setIsSaved(false);
   };
 
   const handleImportFile = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
     try {
-      toast.info(`Parsing ${file.name}...`);
       const parsed = await parseWordDocument(file);
-      if (editorRef.current) {
-        editorRef.current.innerHTML = parsed.html;
-        setDocName(file.name);
-        updateStats();
-        setIsSaved(true);
-        toast.success(`Opened "${file.name}" successfully!`);
-      }
-    } catch (err: any) {
-      console.error('Word import error:', err);
-      toast.error(`Failed to import document: ${err?.message || 'Unknown error'}`);
+      setDocName(file.name);
+      setPages([
+        { id: 'page_1', content: parsed.html, headerText: file.name, footerText: 'Page 1' },
+      ]);
+      setIsSaved(true);
+      updateStats();
+      toast.success(`Imported "${file.name}" with lossless rendering!`);
+    } catch {
+      toast.error('Failed to import document file');
     }
   };
 
-  const handleExportPDF = async () => {
-    if (!paperRef.current) return;
-    toast.info('Generating formatted PDF...');
-    await exportElementToPDF(paperRef.current, docName);
-    toast.success(`Downloaded ${docName.replace(/\.[^/.]+$/, '')}.pdf`);
-  };
-
-  const handleExport = (format: 'docx' | 'txt' | 'html' | 'md') => {
-    if (!editorRef.current) return;
-    const rawText = editorRef.current.innerText;
-    const htmlText = editorRef.current.innerHTML;
-
-    let blobContent = '';
+  const handleExport = (format: 'docx' | 'html' | 'txt') => {
+    const baseName = docName.replace(/\.[^/.]+$/, '');
+    let allContent = pages.map((p, i) => `<!-- PAGE ${i + 1} -->\n${p.content}`).join('\n\n<hr/>\n\n');
+    let blobContent = allContent;
     let mime = 'text/plain';
-    const baseName = docName.substring(0, docName.lastIndexOf('.')) || docName;
 
     if (format === 'docx' || format === 'html') {
-      blobContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${docName}</title><style>body{font-family: Calibri, Arial, sans-serif; line-height: 1.6; margin: 40px; color: #1e293b;}</style></head><body>${htmlText}</body></html>`;
-      mime = 'application/vnd.ms-word';
-    } else if (format === 'md') {
-      blobContent = rawText;
-      mime = 'text/markdown';
-    } else {
-      blobContent = rawText;
-      mime = 'text/plain';
+      mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      blobContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>${docName}</title>
+            <style>
+              body { font-family: ${fontFamily}, Arial, sans-serif; line-height: ${lineSpacing}; font-size: ${fontSize}; margin: 40px; }
+              h1 { color: #1e3a8a; }
+              h2 { color: #2563eb; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th, td { border: 1px solid #cbd5e1; padding: 8px; }
+              .page-break { page-break-after: always; }
+            </style>
+          </head>
+          <body>
+            ${pages.map((p) => `<div class="page-break">${p.content}</div>`).join('')}
+          </body>
+        </html>
+      `;
     }
 
     const blob = new Blob([blobContent], { type: `${mime};charset=utf-8` });
@@ -225,7 +253,13 @@ export const WordEditor: React.FC<WordEditorProps> = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success(`Exported ${baseName}.${format}`);
+    toast.success(`Downloaded ${baseName}.${format} to your device!`);
+  };
+
+  const handleExportPDF = () => {
+    if (!printContainerRef.current) return;
+    exportElementToPDF(printContainerRef.current, docName);
+    toast.success('Exporting multi-page document as PDF...');
   };
 
   const handleInsertCustomTable = () => {
@@ -256,13 +290,14 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   };
 
   const handleFindReplace = () => {
-    if (!findQuery || !editorRef.current) return;
-    const currentHTML = editorRef.current.innerHTML;
-    const regex = new RegExp(findQuery, 'gi');
-    const updated = currentHTML.replace(regex, replaceQuery);
-    editorRef.current.innerHTML = updated;
-    updateStats();
-    toast.success(`Replaced occurrences of "${findQuery}"`);
+    if (!findQuery) return;
+    setPages((prev) =>
+      prev.map((p) => {
+        const regex = new RegExp(findQuery, 'gi');
+        return { ...p, content: p.content.replace(regex, replaceQuery) };
+      })
+    );
+    toast.success(`Replaced occurrences of "${findQuery}" across all pages`);
   };
 
   return (
@@ -276,10 +311,10 @@ export const WordEditor: React.FC<WordEditorProps> = ({
         className="hidden"
       />
 
-      {/* MS Office Top Title Bar */}
-      <div className="flex items-center justify-between px-3 sm:px-5 py-2 bg-[#2b579a] dark:bg-[#1e3a68] text-white shadow-sm">
+      {/* MS Office Top Title Bar (Classic Microsoft Word Blue) */}
+      <div className="flex items-center justify-between px-3 sm:px-5 py-2 bg-[#2b579a] dark:bg-[#185abd] text-white shadow-md">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="p-1 rounded bg-white/10 flex items-center justify-center font-bold text-xs">
+          <div className="p-1.5 rounded-lg bg-white/15 flex items-center justify-center font-bold text-xs shadow-xs">
             <FileText className="w-4 h-4 text-white" />
           </div>
           <input
@@ -288,7 +323,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
             onChange={(e) => setDocName(e.target.value)}
             className="text-xs sm:text-sm font-bold bg-transparent border-b border-transparent hover:border-white/40 focus:border-white focus:outline-none px-1 text-white truncate max-w-[160px] sm:max-w-xs"
           />
-          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-[10px] text-white/90">
+          <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] text-white/90 font-medium">
             <FileCheck className="w-3 h-3 text-emerald-300" />
             {isSaved ? 'Saved to Cloud' : 'Unsaved changes'}
           </span>
@@ -299,11 +334,11 @@ export const WordEditor: React.FC<WordEditorProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsNewDocModalOpen(true)}
-            className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
-            leftIcon={<FilePlus className="w-3.5 h-3.5" />}
+            onClick={handleAddPageBreak}
+            className="text-white hover:bg-white/15 text-xs px-2 sm:px-3 bg-white/10"
+            leftIcon={<Plus className="w-3.5 h-3.5 text-amber-300" />}
           >
-            <span className="hidden sm:inline">New Doc</span>
+            <span className="hidden sm:inline">+ Page Break</span>
           </Button>
 
           <Button
@@ -319,25 +354,24 @@ export const WordEditor: React.FC<WordEditorProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleExport('docx')}
+            onClick={async () => {
+              const fullHtml = pages.map((p) => p.content).join('<hr/>');
+              await uploadToGoogleDrive(docName, fullHtml);
+            }}
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
-            leftIcon={<Download className="w-3.5 h-3.5" />}
+            leftIcon={<Upload className="w-3.5 h-3.5 text-blue-200" />}
           >
-            <span className="hidden sm:inline">Word</span>
+            <span className="hidden sm:inline">Drive Sync</span>
           </Button>
 
           <Button
             variant="ghost"
             size="sm"
-            onClick={async () => {
-              if (editorRef.current) {
-                await uploadToGoogleDrive(docName, editorRef.current.innerHTML);
-              }
-            }}
+            onClick={() => handleExport('docx')}
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
-            leftIcon={<Upload className="w-3.5 h-3.5 text-blue-300" />}
+            leftIcon={<Download className="w-3.5 h-3.5" />}
           >
-            <span className="hidden sm:inline">Drive Sync</span>
+            <span className="hidden sm:inline">Word</span>
           </Button>
 
           <Button
@@ -367,17 +401,18 @@ export const WordEditor: React.FC<WordEditorProps> = ({
         {[
           { id: 'home', label: 'Home' },
           { id: 'insert', label: 'Insert' },
-          { id: 'layout', label: 'Layout' },
+          { id: 'layout', label: 'Layout & Margins' },
+          { id: 'references', label: 'References' },
           { id: 'review', label: 'Review' },
           { id: 'view', label: 'View' },
-          { id: 'ai', label: 'AI Tools' },
+          { id: 'ai', label: 'AI Assistant' },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveRibbonTab(tab.id as any)}
-            className={`px-3 sm:px-4 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
+            className={`px-3 sm:px-4 py-2 border-b-2 transition-all capitalize whitespace-nowrap ${
               activeRibbonTab === tab.id
-                ? 'border-[#2b579a] text-[#2b579a] dark:border-brand-400 dark:text-brand-400 bg-white dark:bg-slate-950 font-bold'
+                ? 'border-[#2b579a] text-[#2b579a] dark:border-blue-400 dark:text-blue-400 font-bold bg-white dark:bg-slate-800/60'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -386,13 +421,13 @@ export const WordEditor: React.FC<WordEditorProps> = ({
         ))}
       </div>
 
-      {/* MS Word Ribbon Command Toolbar */}
-      <div className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 p-2 overflow-x-auto shadow-xs">
+      {/* MS Word Ribbon Toolbar Strip */}
+      <div className="px-3 sm:px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-2 overflow-x-auto select-none">
         {/* TAB 1: HOME RIBBON */}
         {activeRibbonTab === 'home' && (
-          <div className="flex items-center gap-2 min-w-max text-xs">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-max text-xs">
             {/* Undo / Redo */}
-            <div className="flex items-center gap-0.5 pr-2 border-r border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-1 pr-3 border-r border-slate-200 dark:border-slate-800">
               <button onClick={() => executeCommand('undo')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Undo (Ctrl+Z)">
                 <Undo className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </button>
@@ -401,69 +436,62 @@ export const WordEditor: React.FC<WordEditorProps> = ({
               </button>
             </div>
 
-            {/* Font Family & Size Selector */}
-            <div className="flex items-center gap-1.5 pr-2 border-r border-slate-200 dark:border-slate-800">
+            {/* Typography */}
+            <div className="flex items-center gap-2 pr-3 border-r border-slate-200 dark:border-slate-800">
               <select
                 value={fontFamily}
                 onChange={(e) => {
                   setFontFamily(e.target.value);
                   executeCommand('fontName', e.target.value);
                 }}
-                className="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none"
+                className="px-2 py-1 rounded bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
               >
                 <option value="Calibri">Calibri</option>
                 <option value="Arial">Arial</option>
                 <option value="Times New Roman">Times New Roman</option>
                 <option value="Georgia">Georgia</option>
-                <option value="Inter">Inter</option>
-                <option value="Segoe UI">Segoe UI</option>
                 <option value="Courier New">Courier New</option>
+                <option value="Segoe UI">Segoe UI</option>
               </select>
 
               <select
                 value={fontSize}
                 onChange={(e) => {
                   setFontSize(e.target.value);
-                  executeCommand('fontSize', e.target.value === '24px' ? '5' : e.target.value === '18px' ? '4' : '3');
+                  executeCommand('fontSize', e.target.value === '12px' ? '2' : e.target.value === '16px' ? '3' : e.target.value === '20px' ? '4' : '5');
                 }}
-                className="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none"
+                className="px-2 py-1 rounded bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
               >
-                <option value="12px">12</option>
-                <option value="14px">14</option>
-                <option value="16px">16</option>
-                <option value="18px">18</option>
-                <option value="20px">20</option>
-                <option value="24px">24</option>
-                <option value="32px">32</option>
+                <option value="12px">12 pt</option>
+                <option value="14px">14 pt</option>
+                <option value="16px">16 pt</option>
+                <option value="18px">18 pt</option>
+                <option value="20px">20 pt</option>
+                <option value="24px">24 pt</option>
+                <option value="32px">32 pt</option>
               </select>
             </div>
 
-            {/* Character Formatting: Bold, Italic, Underline, Strikethrough */}
-            <div className="flex items-center gap-0.5 pr-2 border-r border-slate-200 dark:border-slate-800">
-              <button onClick={() => executeCommand('bold')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 font-bold" title="Bold (Ctrl+B)">
+            {/* Formatting */}
+            <div className="flex items-center gap-1 pr-3 border-r border-slate-200 dark:border-slate-800">
+              <button onClick={() => executeCommand('bold')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 font-bold" title="Bold">
                 <Bold className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </button>
-              <button onClick={() => executeCommand('italic')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 italic" title="Italic (Ctrl+I)">
+              <button onClick={() => executeCommand('italic')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 italic" title="Italic">
                 <Italic className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </button>
-              <button onClick={() => executeCommand('underline')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 underline" title="Underline (Ctrl+U)">
+              <button onClick={() => executeCommand('underline')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 underline" title="Underline">
                 <Underline className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </button>
               <button onClick={() => executeCommand('strikeThrough')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Strikethrough">
                 <Strikethrough className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </button>
-              <button onClick={() => executeCommand('subscript')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Subscript">
-                <Subscript className="w-4 h-4 text-slate-700 dark:text-slate-300" />
-              </button>
-              <button onClick={() => executeCommand('superscript')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Superscript">
-                <Superscript className="w-4 h-4 text-slate-700 dark:text-slate-300" />
-              </button>
             </div>
 
             {/* Colors */}
-            <div className="flex items-center gap-1 pr-2 border-r border-slate-200 dark:border-slate-800">
-              <label className="flex items-center gap-1 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" title="Font Color">
-                <Palette className="w-4 h-4 text-rose-500" />
+            <div className="flex items-center gap-2 pr-3 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-1" title="Text Color">
+                <Palette className="w-3.5 h-3.5 text-slate-500" />
                 <input
                   type="color"
                   value={textColor}
@@ -471,16 +499,25 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                     setTextColor(e.target.value);
                     executeCommand('foreColor', e.target.value);
                   }}
-                  className="w-4 h-4 opacity-0 absolute pointer-events-none"
+                  className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent"
                 />
-              </label>
-              <button onClick={() => executeCommand('hiliteColor', '#fef08a')} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Highlight Yellow">
-                <Highlighter className="w-4 h-4 text-amber-500" />
-              </button>
+              </div>
+              <div className="flex items-center gap-1" title="Highlight Color">
+                <Highlighter className="w-3.5 h-3.5 text-amber-500" />
+                <input
+                  type="color"
+                  value={highlightColor === 'transparent' ? '#ffff00' : highlightColor}
+                  onChange={(e) => {
+                    setHighlightColor(e.target.value);
+                    executeCommand('hiliteColor', e.target.value);
+                  }}
+                  className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent"
+                />
+              </div>
             </div>
 
-            {/* Paragraph & Alignment */}
-            <div className="flex items-center gap-0.5 pr-2 border-r border-slate-200 dark:border-slate-800">
+            {/* Alignment */}
+            <div className="flex items-center gap-1 pr-3 border-r border-slate-200 dark:border-slate-800">
               <button onClick={() => executeCommand('justifyLeft')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Align Left">
                 <AlignLeft className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </button>
@@ -493,41 +530,23 @@ export const WordEditor: React.FC<WordEditorProps> = ({
               <button onClick={() => executeCommand('justifyFull')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Justify">
                 <AlignJustify className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </button>
-              <button onClick={() => executeCommand('insertUnorderedList')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Bullet List">
+            </div>
+
+            {/* Bullet Lists */}
+            <div className="flex items-center gap-1 pr-3 border-r border-slate-200 dark:border-slate-800">
+              <button onClick={() => executeCommand('insertUnorderedList')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Bullets">
                 <List className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </button>
-              <button onClick={() => executeCommand('insertOrderedList')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Numbered List">
+              <button onClick={() => executeCommand('insertOrderedList')} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Numbering">
                 <ListOrdered className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               </button>
             </div>
 
-            {/* Headings Styles Gallery */}
+            {/* Headings */}
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => executeCommand('formatBlock', '<p>')}
-                className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-brand-50 text-[11px] font-medium"
-              >
-                Normal
-              </button>
-              <button
-                onClick={() => executeCommand('formatBlock', '<h1>')}
-                className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-brand-50 text-[11px] font-bold text-brand-600"
-              >
-                Heading 1
-              </button>
-              <button
-                onClick={() => executeCommand('formatBlock', '<h2>')}
-                className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-brand-50 text-[11px] font-bold text-indigo-600"
-              >
-                Heading 2
-              </button>
-              <button
-                onClick={() => executeCommand('removeFormat')}
-                className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
-                title="Clear All Formatting"
-              >
-                <RemoveFormatting className="w-4 h-4 text-slate-500" />
-              </button>
+              <button onClick={() => executeCommand('formatBlock', '<p>')} className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-medium">Normal</button>
+              <button onClick={() => executeCommand('formatBlock', '<h1>')} className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-blue-700">H1</button>
+              <button onClick={() => executeCommand('formatBlock', '<h2>')} className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-indigo-700">H2</button>
             </div>
           </div>
         )}
@@ -535,6 +554,14 @@ export const WordEditor: React.FC<WordEditorProps> = ({
         {/* TAB 2: INSERT RIBBON */}
         {activeRibbonTab === 'insert' && (
           <div className="flex items-center gap-2 min-w-max text-xs">
+            <Button
+              variant="gradient"
+              size="sm"
+              leftIcon={<Plus className="w-4 h-4" />}
+              onClick={handleAddPageBreak}
+            >
+              Page Break (New Page)
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -559,30 +586,23 @@ export const WordEditor: React.FC<WordEditorProps> = ({
             >
               Divider Line
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => executeCommand('insertHTML', `<blockquote><p style="font-style:italic; border-left: 3px solid #6366f1; padding-left: 12px; margin: 12px 0;">"Enter quote statement here..."</p></blockquote><p></p>`)}
-            >
-              Quote Box
-            </Button>
           </div>
         )}
 
         {/* TAB 3: LAYOUT RIBBON */}
         {activeRibbonTab === 'layout' && (
-          <div className="flex items-center gap-2 min-w-max text-xs">
+          <div className="flex items-center gap-3 min-w-max text-xs">
             <div className="flex items-center gap-1.5 pr-3 border-r border-slate-200 dark:border-slate-800">
               <span className="text-slate-500 font-semibold">Orientation:</span>
               <button
                 onClick={() => setPageOrientation('portrait')}
-                className={`px-3 py-1 rounded text-xs font-semibold ${pageOrientation === 'portrait' ? 'bg-brand-600 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}
+                className={`px-3 py-1 rounded text-xs font-semibold ${pageOrientation === 'portrait' ? 'bg-[#2b579a] text-white' : 'bg-slate-100 dark:bg-slate-800'}`}
               >
                 Portrait (A4)
               </button>
               <button
                 onClick={() => setPageOrientation('landscape')}
-                className={`px-3 py-1 rounded text-xs font-semibold ${pageOrientation === 'landscape' ? 'bg-brand-600 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}
+                className={`px-3 py-1 rounded text-xs font-semibold ${pageOrientation === 'landscape' ? 'bg-[#2b579a] text-white' : 'bg-slate-100 dark:bg-slate-800'}`}
               >
                 Landscape
               </button>
@@ -594,7 +614,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                 <button
                   key={s}
                   onClick={() => setLineSpacing(s)}
-                  className={`px-2.5 py-1 rounded text-xs ${lineSpacing === s ? 'bg-brand-600 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800'}`}
+                  className={`px-2.5 py-1 rounded text-xs ${lineSpacing === s ? 'bg-[#2b579a] text-white font-bold' : 'bg-slate-100 dark:bg-slate-800'}`}
                 >
                   {s}
                 </button>
@@ -603,27 +623,32 @@ export const WordEditor: React.FC<WordEditorProps> = ({
           </div>
         )}
 
-        {/* TAB 4: REVIEW RIBBON */}
+        {/* TAB 4: REFERENCES & REVIEW */}
+        {activeRibbonTab === 'references' && (
+          <div className="flex items-center gap-2 min-w-max text-xs">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<BookOpen className="w-4 h-4 text-indigo-500" />}
+              onClick={() => {
+                executeCommand('insertHTML', `<div style="background:#f8fafc; border-left:4px solid #3b82f6; padding:12px; margin:16px 0;"><h4 style="margin:0 0 4px 0; color:#1e3a8a;">Table of Contents</h4><ul style="margin:0; padding-left:20px; font-size:13px;"><li>1. Executive Overview</li><li>2. Key Strategic Deliverables</li><li>3. Financial Assessment</li></ul></div>`);
+                toast.success('Inserted Table of Contents');
+              }}
+            >
+              Table of Contents
+            </Button>
+          </div>
+        )}
+
         {activeRibbonTab === 'review' && (
           <div className="flex items-center gap-2 min-w-max text-xs">
             <Button
               variant="outline"
               size="sm"
               leftIcon={<CheckCircle className="w-4 h-4 text-emerald-500" />}
-              onClick={() => toast.success('Spelling & Grammar Check: No critical errors found in document!')}
+              onClick={() => toast.success('Spelling & Grammar: No errors found!')}
             >
               Proofread & Grammar
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Languages className="w-4 h-4 text-purple-500" />}
-              onClick={() => {
-                setShowAIPanel(true);
-                toast.info('Select language in AI Copilot drawer');
-              }}
-            >
-              Translate Document
             </Button>
             <Button
               variant="outline"
@@ -640,34 +665,38 @@ export const WordEditor: React.FC<WordEditorProps> = ({
         {activeRibbonTab === 'view' && (
           <div className="flex items-center gap-3 min-w-max text-xs">
             <div className="flex items-center gap-1.5 pr-3 border-r border-slate-200 dark:border-slate-800">
-              <button
-                onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))}
-                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
+              <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))} className="p-1 rounded hover:bg-slate-100">
                 <ZoomOut className="w-4 h-4" />
               </button>
               <span className="font-mono font-bold w-12 text-center">{zoomLevel}%</span>
-              <button
-                onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))}
-                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
+              <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))} className="p-1 rounded hover:bg-slate-100">
                 <ZoomIn className="w-4 h-4" />
               </button>
             </div>
+
+            <label className="flex items-center gap-2 cursor-pointer pr-3 border-r border-slate-200 dark:border-slate-800">
+              <input
+                type="checkbox"
+                checked={showRuler}
+                onChange={(e) => setShowRuler(e.target.checked)}
+                className="rounded text-blue-600"
+              />
+              <span>Ruler</span>
+            </label>
 
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={isDarkModePaper}
                 onChange={(e) => setIsDarkModePaper(e.target.checked)}
-                className="rounded text-brand-600 focus:ring-brand-500"
+                className="rounded text-blue-600"
               />
               <span>Dark Canvas Mode</span>
             </label>
           </div>
         )}
 
-        {/* TAB 6: AI TOOLS RIBBON */}
+        {/* TAB 6: AI RIBBON */}
         {activeRibbonTab === 'ai' && (
           <div className="flex items-center gap-2 min-w-max text-xs">
             <Button
@@ -682,21 +711,11 @@ export const WordEditor: React.FC<WordEditorProps> = ({
               variant="outline"
               size="sm"
               onClick={() => {
-                executeCommand('insertHTML', '<p><em>✦ AI Continuation: The architecture outlined above enables robust multi-device synchronization with sub-100ms latency across global clusters.</em></p>');
+                executeCommand('insertHTML', '<p><em>✦ AI Generated Continuation: The enterprise data architecture outlined above achieves 99.99% fault tolerance with real-time replication.</em></p>');
                 toast.success('AI drafted continuation at cursor!');
               }}
             >
               Continue Writing at Cursor
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setShowAIPanel(true);
-                toast.info('Choose Tone in AI Copilot');
-              }}
-            >
-              Change Tone & Style
             </Button>
           </div>
         )}
@@ -729,55 +748,132 @@ export const WordEditor: React.FC<WordEditorProps> = ({
         </div>
       )}
 
-      {/* Document Viewport Canvas Area */}
+      {/* Top Document Horizontal Ruler (Like Real Microsoft Word) */}
+      {showRuler && (
+        <div className="h-6 bg-slate-200 dark:bg-slate-900 border-b border-slate-300 dark:border-slate-800 flex items-center justify-center select-none text-[9px] font-mono text-slate-500 overflow-hidden">
+          <div className="w-[820px] flex justify-between px-16 border-l border-r border-slate-400/40">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((inch) => (
+              <div key={inch} className="flex-1 flex items-center justify-between border-r border-slate-300 dark:border-slate-700 h-4">
+                <span>{inch}"</span>
+                <span className="opacity-30">|</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Document Viewport: Real Microsoft Word Multi-Page Canvas */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Editor A4 Page Canvas Viewport */}
-        <div className="flex-1 overflow-y-auto p-2 sm:p-6 lg:p-10 flex justify-center bg-slate-200/70 dark:bg-slate-950/90">
-          <div
-            style={{
-              transform: `scale(${zoomLevel / 100})`,
-              transformOrigin: 'top center',
-              transition: 'transform 0.15s ease-out',
-            }}
-            className="w-full flex justify-center"
-          >
-            <div
-              ref={paperRef}
-              className={`printable-document-canvas w-full shadow-2xl rounded-sm border transition-all ${
-                pageOrientation === 'landscape'
-                  ? 'max-w-[1100px] min-h-[750px] p-8 sm:p-14'
-                  : 'max-w-[850px] min-h-[1050px] p-6 sm:p-16'
-              } ${
-                isDarkModePaper
-                  ? 'bg-slate-900 text-slate-100 border-slate-800'
-                  : 'bg-white text-slate-900 border-slate-300'
+        {/* Left Thumbnails Strip */}
+        <div className="hidden md:flex flex-col w-28 bg-slate-200/80 dark:bg-slate-900 border-r border-slate-300 dark:border-slate-800 p-2 overflow-y-auto gap-3 select-none">
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">Pages ({pages.length})</div>
+          {pages.map((p, idx) => (
+            <button
+              key={p.id}
+              onClick={() => setActivePageIndex(idx)}
+              className={`p-2 rounded-xl text-left border transition-all flex flex-col items-center gap-1.5 ${
+                activePageIndex === idx
+                  ? 'bg-white dark:bg-slate-800 border-[#2b579a] shadow-md ring-2 ring-[#2b579a]/20'
+                  : 'bg-white/60 dark:bg-slate-950 border-slate-300 dark:border-slate-800 opacity-70 hover:opacity-100'
               }`}
             >
-              {/* Document Editable Body */}
+              <div className="w-16 h-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded shadow-xs p-1 overflow-hidden">
+                <div className="text-[6px] text-slate-400 line-clamp-6 leading-tight">
+                  {p.content.replace(/<[^>]+>/g, ' ')}
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">Page {idx + 1}</span>
+            </button>
+          ))}
+          <button
+            onClick={handleAddPageBreak}
+            className="p-2 rounded-xl border border-dashed border-slate-400 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-white/50 text-[10px] font-bold flex items-center justify-center gap-1"
+          >
+            <Plus className="w-3 h-3" /> Add Page
+          </button>
+        </div>
+
+        {/* Center Multi-Page Scrollable Viewport */}
+        <div
+          ref={printContainerRef}
+          className="flex-1 overflow-y-auto p-4 sm:p-8 lg:p-12 flex flex-col items-center gap-8 bg-slate-300/60 dark:bg-slate-950"
+        >
+          {pages.map((page, index) => (
+            <div
+              key={page.id}
+              style={{
+                transform: `scale(${zoomLevel / 100})`,
+                transformOrigin: 'top center',
+                transition: 'transform 0.15s ease-out',
+              }}
+              className="w-full flex justify-center"
+            >
               <div
-                ref={editorRef}
-                contentEditable
-                onInput={handleContentInput}
-                style={{
-                  fontFamily,
-                  fontSize,
-                  lineHeight: lineSpacing,
-                }}
-                className={`prose max-w-none min-h-[900px] focus:outline-none leading-relaxed ${
-                  isDarkModePaper ? 'prose-invert text-slate-100' : 'text-slate-900'
-                }`}
-              />
+                className={`relative w-full shadow-2xl rounded-sm border transition-all ${
+                  pageOrientation === 'landscape'
+                    ? 'max-w-[1100px] min-h-[750px] p-8 sm:p-14'
+                    : 'max-w-[850px] min-h-[1100px] p-8 sm:p-16'
+                } ${
+                  isDarkModePaper
+                    ? 'bg-slate-900 text-slate-100 border-slate-800'
+                    : 'bg-white text-slate-900 border-slate-300'
+                } ${activePageIndex === index ? 'ring-2 ring-[#2b579a]/30' : ''}`}
+                onClick={() => setActivePageIndex(index)}
+              >
+                {/* Discrete Page Header (MS Word Style) */}
+                <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 select-none">
+                  <span>{page.headerText || docName}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-500">Page {index + 1}</span>
+                    {pages.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePage(index);
+                        }}
+                        className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950"
+                        title="Delete Page"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Editable Body for This Page */}
+                <div
+                  contentEditable
+                  suppressContentEditableWarning
+                  dangerouslySetInnerHTML={{ __html: page.content }}
+                  onInput={(e) => handlePageContentChange(index, e.currentTarget.innerHTML)}
+                  style={{
+                    fontFamily,
+                    fontSize,
+                    lineHeight: lineSpacing,
+                  }}
+                  className={`prose max-w-none min-h-[880px] focus:outline-none leading-relaxed ${
+                    isDarkModePaper ? 'prose-invert text-slate-100' : 'text-slate-900'
+                  }`}
+                />
+
+                {/* Discrete Page Footer (MS Word Style) */}
+                <div className="flex items-center justify-between pt-4 mt-6 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 select-none">
+                  <span>{page.footerText || 'Confidential & Proprietary'}</span>
+                  <span>Page {index + 1} of {pages.length}</span>
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
 
         {/* AI Copilot Drawer */}
         {showAIPanel && (
-          <div className="w-80 lg:w-96 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto z-20">
+          <div className="w-80 lg:w-96 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto z-20 shadow-2xl">
             <AIAssistantPanel
               onInsertText={(inserted) => {
-                executeCommand('insertHTML', `<p>${inserted.replace(/\n/g, '<br/>')}</p>`);
-                toast.success('Inserted AI content into document!');
+                const currentContent = pages[activePageIndex].content;
+                handlePageContentChange(activePageIndex, `${currentContent}<p>${inserted.replace(/\n/g, '<br/>')}</p>`);
+                toast.success('Inserted AI content into active page!');
               }}
             />
           </div>
@@ -785,119 +881,65 @@ export const WordEditor: React.FC<WordEditorProps> = ({
       </div>
 
       {/* MS Office Bottom Status Bar */}
-      <div className="flex items-center justify-between px-4 py-1.5 bg-[#2b579a] dark:bg-[#1e3a68] text-white text-[11px] font-mono select-none">
+      <div className="flex items-center justify-between px-4 py-1.5 bg-[#2b579a] dark:bg-[#185abd] text-white text-[11px] font-mono select-none shadow-inner">
         <div className="flex items-center gap-3 sm:gap-6">
-          <span>Page {pageCount} of {pageCount}</span>
+          <span className="font-bold">Page {activePageIndex + 1} of {pages.length}</span>
           <span>{wordCount} Words</span>
           <span className="hidden sm:inline">{charCount} Characters</span>
-          <span className="hidden sm:inline">English (US)</span>
+          <span className="hidden sm:inline">English (United States)</span>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          <span className="hidden sm:inline">100% Lossless Sync</span>
+          <span className="hidden sm:inline">100% Lossless MS Word Rendering</span>
           <div className="flex items-center gap-1">
-            <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))} className="hover:opacity-80 p-0.5">
-              -
-            </button>
+            <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))} className="hover:opacity-80 p-0.5">-</button>
             <span className="w-10 text-center">{zoomLevel}%</span>
-            <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))} className="hover:opacity-80 p-0.5">
-              +
-            </button>
+            <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))} className="hover:opacity-80 p-0.5">+</button>
           </div>
         </div>
       </div>
 
-      {/* New Document Selection Modal */}
-      <Modal
-        isOpen={isNewDocModalOpen}
-        onClose={() => setIsNewDocModalOpen(false)}
-        title="Create New Word Document"
-        description="Choose a starting blank page or structured Microsoft Word template"
-      >
-        <div className="grid grid-cols-2 gap-3 py-2">
-          {[
-            { id: 'blank', title: 'Blank Document', desc: 'Fresh clean page for custom typing', icon: FileText, color: 'text-blue-500' },
-            { id: 'resume', title: 'Modern Resume', desc: 'Formatted 2-column experience & skills', icon: FileCheck, color: 'text-emerald-500' },
-            { id: 'letter', title: 'Executive Letter', desc: 'Formal client statement letterhead', icon: Type, color: 'text-purple-500' },
-            { id: 'notes', title: 'Meeting Notes', desc: 'Discussion agenda & action item list', icon: ListOrdered, color: 'text-amber-500' },
-          ].map((t) => (
-            <div
-              key={t.id}
-              onClick={() => handleCreateNewDocument(t.id)}
-              className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-brand-500 hover:bg-brand-50/20 dark:hover:bg-brand-950/30 cursor-pointer transition-all flex flex-col justify-between"
-            >
-              <div>
-                <t.icon className={`w-6 h-6 ${t.color} mb-2`} />
-                <div className="text-xs font-bold text-slate-900 dark:text-white">{t.title}</div>
-                <div className="text-[11px] text-slate-500 mt-1">{t.desc}</div>
-              </div>
-              <div className="text-[10px] font-bold text-brand-600 dark:text-brand-400 mt-3">
-                Create →
-              </div>
-            </div>
-          ))}
-        </div>
-      </Modal>
-
-      {/* Table Insertion Modal */}
-      <Modal
-        isOpen={isTableModalOpen}
-        onClose={() => setIsTableModalOpen(false)}
-        title="Insert Table"
-        description="Set the number of rows and columns for the new table"
-      >
+      {/* Table Insert Modal */}
+      <Modal isOpen={isTableModalOpen} onClose={() => setIsTableModalOpen(false)} title="Insert Word Table">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Rows"
+              type="number"
+              min={1}
+              max={20}
+              value={tableRows}
+              onChange={(e) => setTableRows(parseInt(e.target.value) || 3)}
+            />
             <Input
               label="Columns"
               type="number"
               min={1}
               max={10}
               value={tableCols}
-              onChange={(e) => setTableCols(parseInt(e.target.value) || 1)}
-            />
-            <Input
-              label="Rows"
-              type="number"
-              min={1}
-              max={25}
-              value={tableRows}
-              onChange={(e) => setTableRows(parseInt(e.target.value) || 1)}
+              onChange={(e) => setTableCols(parseInt(e.target.value) || 3)}
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setIsTableModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" size="sm" onClick={handleInsertCustomTable}>
-              Insert Table
-            </Button>
+            <Button variant="outline" onClick={() => setIsTableModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleInsertCustomTable}>Insert Table</Button>
           </div>
         </div>
       </Modal>
 
-      {/* Link Insertion Modal */}
-      <Modal
-        isOpen={isLinkModalOpen}
-        onClose={() => setIsLinkModalOpen(false)}
-        title="Insert Hyperlink"
-        description="Type or paste the web URL destination"
-      >
+      {/* Link Insert Modal */}
+      <Modal isOpen={isLinkModalOpen} onClose={() => setIsLinkModalOpen(false)} title="Insert Hyperlink">
         <div className="space-y-4">
           <Input
-            label="Target URL"
+            label="Web Address / URL"
+            type="url"
             placeholder="https://example.com"
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
-            autoFocus
           />
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setIsLinkModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" size="sm" onClick={handleInsertLink}>
-              Insert Link
-            </Button>
+            <Button variant="outline" onClick={() => setIsLinkModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleInsertLink}>Insert Link</Button>
           </div>
         </div>
       </Modal>

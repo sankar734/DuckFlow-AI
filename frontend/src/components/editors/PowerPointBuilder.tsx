@@ -533,6 +533,21 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
               <span>Slide {activeSlideIndex + 1} of {slides.length}</span>
             </div>
           </div>
+
+          {/* Presenter Notes Box (Like Real Microsoft PowerPoint) */}
+          <div className="w-full max-w-4xl mt-4 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              <span>Presenter Speaker Notes</span>
+              <span className="text-rose-500 font-semibold">Only visible to presenter</span>
+            </div>
+            <textarea
+              rows={2}
+              value={activeSlide.speakerNotes || ''}
+              onChange={(e) => handleUpdateSlide({ speakerNotes: e.target.value })}
+              placeholder="Click to add presenter speaker notes for this slide..."
+              className="w-full text-xs p-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#d24726]"
+            />
+          </div>
         </div>
       </div>
 
