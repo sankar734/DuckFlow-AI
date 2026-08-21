@@ -208,11 +208,11 @@ export const AIStudioPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-white">Gmail Cloud & Google Drive Storage</span>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Connected ({cloudState.email})
+                <CheckCircle2 className="w-3 h-3" /> {cloudState.isConnected && cloudState.email ? `Connected (${cloudState.email})` : 'Cloud Sync Ready'}
               </span>
             </div>
             <p className="text-[11px] text-slate-300 mt-0.5">
-              Zero storage limits. Save files directly to your device storage or sync to Google Drive.
+              Zero storage limits. Save files directly to your device storage or sync to your personal Google Drive.
             </p>
           </div>
         </div>

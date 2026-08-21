@@ -77,7 +77,7 @@ export class EmailService {
     try {
       if (this.transporter) {
         await this.transporter.sendMail({
-          from: `"DocuFlow AI Security" <${env.SMTP_USER || 'sankarsri023@gmail.com'}>`,
+          from: `"DocuFlow AI Security" <${env.SMTP_USER || 'noreply@docuflow.ai'}>`,
           to,
           subject: '🔐 New Sign-In to DocuFlow AI from your Google Account',
           html,
@@ -155,7 +155,7 @@ export class EmailService {
     try {
       if (this.transporter) {
         await this.transporter.sendMail({
-          from: `"DocuFlow AI Billing" <${env.SMTP_USER || 'sankarsri023@gmail.com'}>`,
+          from: `"DocuFlow AI Billing" <${env.SMTP_USER || 'noreply@docuflow.ai'}>`,
           to,
           subject: `🧾 Payment Receipt: ${planName} Plan (${invoiceNum})`,
           html,

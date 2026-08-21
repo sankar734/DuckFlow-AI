@@ -55,13 +55,13 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
 
   // Card Form State
   const [cardNumber, setCardNumber] = useState('4532 8901 2345 6789');
-  const [cardHolder, setCardHolder] = useState(user?.name || 'Sankar Sri');
+  const [cardHolder, setCardHolder] = useState(user?.name || 'Cardholder Name');
   const [expiry, setExpiry] = useState('08/29');
   const [cvv, setCvv] = useState('782');
   const [saveCard, setSaveCard] = useState(true);
 
   // UPI State
-  const [upiId, setUpiId] = useState(user?.email ? `${user.email.split('@')[0]}@okaxis` : 'sankarsri023@oksbi');
+  const [upiId, setUpiId] = useState(user?.email ? `${user.email.split('@')[0]}@okhdfcbank` : 'user@okhdfcbank');
   const [qrCountdown, setQrCountdown] = useState(300);
 
   // Netbanking State

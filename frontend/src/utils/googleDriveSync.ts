@@ -21,17 +21,34 @@ export interface GDriveAccountState {
 }
 
 export const getGoogleDriveState = (): GDriveAccountState => {
+  let userEmail = '';
+  let userName = '';
+  try {
+    const userStr = localStorage.getItem('docuflow_user');
+    if (userStr) {
+      const u = JSON.parse(userStr);
+      if (u.email) userEmail = u.email;
+      if (u.name) userName = u.name;
+    }
+  } catch {}
+
   try {
     const saved = localStorage.getItem(GDRIVE_STORAGE_KEY);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      return {
+        ...parsed,
+        email: userEmail || parsed.email || 'guest@gmail.com',
+        name: userName || parsed.name || 'User',
+      };
     }
   } catch {}
+
   return {
-    isConnected: true, // Connected by default with user's Google account
-    email: 'sankarsri023@gmail.com',
-    name: 'Sankar S',
-    totalSynced: 12,
+    isConnected: Boolean(userEmail),
+    email: userEmail || 'Not Connected',
+    name: userName || 'User',
+    totalSynced: 0,
     autoSync: true,
   };
 };
@@ -105,22 +122,5 @@ export const getSyncedCloudFiles = (): CloudFileMetadata[] => {
       return JSON.parse(saved);
     }
   } catch {}
-  return [
-    {
-      id: 'g_sample_1',
-      name: 'Executive_Strategic_Proposal.docx',
-      size: 1024 * 48,
-      type: 'DOCX',
-      lastSynced: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-      driveUrl: 'https://drive.google.com',
-    },
-    {
-      id: 'g_sample_2',
-      name: 'Financial_Forecast_2026.xlsx',
-      size: 1024 * 92,
-      type: 'XLSX',
-      lastSynced: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-      driveUrl: 'https://drive.google.com',
-    },
-  ];
+  return [];
 };
