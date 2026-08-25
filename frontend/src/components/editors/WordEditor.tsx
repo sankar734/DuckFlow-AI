@@ -52,6 +52,7 @@ import {
   CornerDownRight,
   ChevronRight,
   BookOpen,
+  MoreVertical,
 } from 'lucide-react';
 import { AIAssistantPanel } from '../ai/AIAssistantPanel';
 import { Button } from '../common/Button';
@@ -129,6 +130,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   // Link Modal
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Load initial content or active draft
   useEffect(() => {
@@ -319,7 +321,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] rounded-3xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl">
+    <div className="flex flex-col h-[calc(100vh-9.5rem)] lg:h-[calc(100vh-6rem)] rounded-2xl sm:rounded-3xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl">
       {/* Hidden File Picker */}
       <input
         type="file"
@@ -330,25 +332,25 @@ export const WordEditor: React.FC<WordEditorProps> = ({
       />
 
       {/* MS Office Top Title Bar (Classic Microsoft Word Blue) */}
-      <div className="flex items-center justify-between px-3 sm:px-5 py-2 bg-[#2b579a] dark:bg-[#185abd] text-white shadow-md">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="p-1.5 rounded-lg bg-white/15 flex items-center justify-center font-bold text-xs shadow-xs">
+      <div className="flex items-center justify-between px-2.5 sm:px-5 py-2 bg-[#2b579a] dark:bg-[#185abd] text-white shadow-md select-none">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
+          <div className="p-1 sm:p-1.5 rounded-lg bg-white/15 flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
             <FileText className="w-4 h-4 text-white" />
           </div>
           <input
             type="text"
             value={docName}
             onChange={(e) => setDocName(e.target.value)}
-            className="text-xs sm:text-sm font-bold bg-transparent border-b border-transparent hover:border-white/40 focus:border-white focus:outline-none px-1 text-white truncate max-w-[160px] sm:max-w-xs"
+            className="text-xs sm:text-sm font-bold bg-transparent border-b border-transparent hover:border-white/40 focus:border-white focus:outline-none px-1 text-white truncate max-w-[120px] xs:max-w-[170px] sm:max-w-xs"
           />
-          <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] text-white/90 font-medium">
+          <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] text-white/90 font-medium shrink-0">
             <FileCheck className="w-3 h-3 text-emerald-300" />
             {isSaved ? 'Saved to Cloud' : 'Unsaved changes'}
           </span>
         </div>
 
-        {/* Primary Action Buttons */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Desktop Primary Action Buttons */}
+        <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 shrink-0">
           <Button
             variant="ghost"
             size="sm"
@@ -356,7 +358,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
             className="text-white hover:bg-white/15 text-xs px-2 sm:px-3 bg-white/10"
             leftIcon={<Plus className="w-3.5 h-3.5 text-amber-300" />}
           >
-            <span className="hidden sm:inline">+ Page Break</span>
+            <span>+ Page Break</span>
           </Button>
 
           <Button
@@ -366,7 +368,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
             leftIcon={<Upload className="w-3.5 h-3.5" />}
           >
-            <span className="hidden sm:inline">Open</span>
+            <span>Open</span>
           </Button>
 
           <Button
@@ -379,7 +381,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
             leftIcon={<Upload className="w-3.5 h-3.5 text-blue-200" />}
           >
-            <span className="hidden sm:inline">Drive Sync</span>
+            <span>Drive Sync</span>
           </Button>
 
           <Button
@@ -389,7 +391,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
             leftIcon={<Download className="w-3.5 h-3.5" />}
           >
-            <span className="hidden sm:inline">Word</span>
+            <span>Word</span>
           </Button>
 
           <Button
@@ -412,10 +414,116 @@ export const WordEditor: React.FC<WordEditorProps> = ({
             <span>AI Copilot</span>
           </Button>
         </div>
+
+        {/* Mobile Action Buttons (Never Overlapping) */}
+        <div className="flex sm:hidden items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleExportPDF}
+            className="text-white hover:bg-white/10 text-xs px-2 bg-white/10"
+            leftIcon={<Printer className="w-3.5 h-3.5 text-amber-300" />}
+          >
+            <span>PDF</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAIPanel(!showAIPanel)}
+            className={`text-xs px-2 ${showAIPanel ? 'bg-purple-600 text-white shadow-glow' : 'text-purple-200 hover:bg-white/10'}`}
+            leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />}
+          >
+            <span>AI</span>
+          </Button>
+
+          <div className="relative">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-1.5 rounded-lg text-white hover:bg-white/15 transition-colors"
+              title="More Actions"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {isMobileMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsMobileMenuOpen(false)} />
+                <div className="absolute right-0 mt-2 w-52 p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 animate-in fade-in duration-150 text-slate-800 dark:text-slate-100">
+                  <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase px-3 py-1">
+                    Document Options
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleAddPageBreak();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Plus className="w-4 h-4 text-amber-500" />
+                    <span>+ Add Page Break</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      fileInputRef.current?.click();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Upload className="w-4 h-4 text-blue-500" />
+                    <span>Open / Import</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsMobileMenuOpen(false);
+                      const fullHtml = pages.map((p) => p.content).join('<hr/>');
+                      await uploadToGoogleDrive(docName, fullHtml);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Upload className="w-4 h-4 text-indigo-500" />
+                    <span>Drive Sync</span>
+                  </button>
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleExport('docx');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Download className="w-4 h-4 text-blue-600" />
+                    <span>Export Word (.docx)</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleExport('html');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Download className="w-4 h-4 text-emerald-600" />
+                    <span>Export HTML</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleExport('txt');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Download className="w-4 h-4 text-slate-500" />
+                    <span>Export Text (.txt)</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* MS Word Ribbon Navigation Tabs */}
-      <div className="flex items-center gap-1 px-2 sm:px-4 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto select-none">
+      <div className="no-scrollbar flex items-center gap-1 px-2 sm:px-4 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto whitespace-nowrap select-none py-1">
         {[
           { id: 'home', label: 'Home' },
           { id: 'insert', label: 'Insert' },
@@ -428,9 +536,9 @@ export const WordEditor: React.FC<WordEditorProps> = ({
           <button
             key={tab.id}
             onClick={() => setActiveRibbonTab(tab.id as any)}
-            className={`px-3 sm:px-4 py-2 border-b-2 transition-all capitalize whitespace-nowrap ${
+            className={`px-3 sm:px-4 py-1.5 rounded-lg border transition-all capitalize whitespace-nowrap ${
               activeRibbonTab === tab.id
-                ? 'border-[#2b579a] text-[#2b579a] dark:border-blue-400 dark:text-blue-400 font-bold bg-white dark:bg-slate-800/60'
+                ? 'border-slate-300 dark:border-slate-700 text-[#2b579a] dark:text-blue-400 font-bold bg-white dark:bg-slate-800 shadow-xs'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -440,7 +548,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
       </div>
 
       {/* MS Word Ribbon Toolbar Strip */}
-      <div className="px-3 sm:px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-2 overflow-x-auto select-none">
+      <div className="no-scrollbar px-2 sm:px-5 py-1.5 sm:py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-2 overflow-x-auto whitespace-nowrap select-none">
         {/* TAB 1: HOME RIBBON */}
         {activeRibbonTab === 'home' && (
           <div className="flex items-center gap-2 sm:gap-4 min-w-max text-xs">
@@ -768,7 +876,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
 
       {/* Top Document Horizontal Ruler (Like Real Microsoft Word) */}
       {showRuler && (
-        <div className="h-6 bg-slate-200 dark:bg-slate-900 border-b border-slate-300 dark:border-slate-800 flex items-center justify-center select-none text-[9px] font-mono text-slate-500 overflow-hidden">
+        <div className="hidden md:flex h-6 bg-slate-200 dark:bg-slate-900 border-b border-slate-300 dark:border-slate-800 items-center justify-center select-none text-[9px] font-mono text-slate-500 overflow-hidden">
           <div className="w-[820px] flex justify-between px-16 border-l border-r border-slate-400/40">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((inch) => (
               <div key={inch} className="flex-1 flex items-center justify-between border-r border-slate-300 dark:border-slate-700 h-4">
@@ -814,7 +922,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
         {/* Center Multi-Page Scrollable Viewport */}
         <div
           ref={printContainerRef}
-          className="flex-1 overflow-y-auto p-4 sm:p-8 lg:p-12 flex flex-col items-center gap-8 bg-slate-300/60 dark:bg-slate-950"
+          className="flex-1 overflow-y-auto p-2 sm:p-6 lg:p-12 flex flex-col items-center gap-4 sm:gap-8 bg-slate-300/60 dark:bg-slate-950"
         >
           {pages.map((page, index) => (
             <div
@@ -829,8 +937,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({
               <div
                 className={`relative w-full shadow-2xl rounded-sm border transition-all ${
                   pageOrientation === 'landscape'
-                    ? 'max-w-[1100px] min-h-[750px] p-8 sm:p-14'
-                    : 'max-w-[850px] min-h-[1100px] p-8 sm:p-16'
+                    ? 'max-w-[1100px] min-h-[500px] sm:min-h-[750px] p-4 sm:p-10 lg:p-14'
+                    : 'max-w-[850px] min-h-[500px] sm:min-h-[1100px] p-4 sm:p-10 lg:p-16'
                 } ${
                   isDarkModePaper
                     ? 'bg-slate-900 text-slate-100 border-slate-800'
@@ -839,8 +947,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                 onClick={() => setActivePageIndex(index)}
               >
                 {/* Discrete Page Header (MS Word Style) */}
-                <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 select-none">
-                  <span>{page.headerText || docName}</span>
+                <div className="flex items-center justify-between pb-3 sm:pb-4 mb-4 sm:mb-6 border-b border-slate-200 dark:border-slate-800 text-[10px] sm:text-[11px] text-slate-400 select-none">
+                  <span className="truncate max-w-[160px] sm:max-w-none">{page.headerText || docName}</span>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-slate-500">Page {index + 1}</span>
                     {pages.length > 1 && (
@@ -869,14 +977,14 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                     fontSize,
                     lineHeight: lineSpacing,
                   }}
-                  className={`document-content prose max-w-none min-h-[880px] focus:outline-none leading-relaxed ${
+                  className={`document-content prose max-w-none min-h-[440px] sm:min-h-[880px] focus:outline-none leading-relaxed ${
                     isDarkModePaper ? 'prose-invert text-slate-100' : 'text-slate-900'
                   }`}
                 />
 
                 {/* Discrete Page Footer (MS Word Style) */}
-                <div className="flex items-center justify-between pt-4 mt-6 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 select-none">
-                  <span>{page.footerText || 'Confidential & Proprietary'}</span>
+                <div className="flex items-center justify-between pt-3 sm:pt-4 mt-4 sm:mt-6 border-t border-slate-200 dark:border-slate-800 text-[10px] sm:text-[11px] text-slate-400 select-none">
+                  <span className="truncate max-w-[140px] sm:max-w-none">{page.footerText || 'Confidential & Proprietary'}</span>
                   <span>Page {index + 1} of {pages.length}</span>
                 </div>
               </div>
@@ -886,7 +994,15 @@ export const WordEditor: React.FC<WordEditorProps> = ({
 
         {/* AI Copilot Drawer */}
         {showAIPanel && (
-          <div className="w-80 lg:w-96 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto z-20 shadow-2xl">
+          <div className="fixed sm:static inset-y-0 right-0 w-80 lg:w-96 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto z-50 sm:z-20 shadow-2xl">
+            <div className="sm:hidden flex justify-end p-2 border-b border-slate-200 dark:border-slate-800">
+              <button
+                onClick={() => setShowAIPanel(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <AIAssistantPanel
               onInsertText={(inserted) => {
                 const currentContent = pages[activePageIndex].content;
@@ -899,20 +1015,20 @@ export const WordEditor: React.FC<WordEditorProps> = ({
       </div>
 
       {/* MS Office Bottom Status Bar */}
-      <div className="flex items-center justify-between px-4 py-1.5 bg-[#2b579a] dark:bg-[#185abd] text-white text-[11px] font-mono select-none shadow-inner">
-        <div className="flex items-center gap-3 sm:gap-6">
-          <span className="font-bold">Page {activePageIndex + 1} of {pages.length}</span>
-          <span>{wordCount} Words</span>
+      <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 bg-[#2b579a] dark:bg-[#185abd] text-white text-[10px] sm:text-[11px] font-mono select-none shadow-inner">
+        <div className="flex items-center gap-2 sm:gap-6">
+          <span className="font-bold">P.{activePageIndex + 1}/{pages.length}</span>
+          <span>{wordCount} W</span>
           <span className="hidden sm:inline">{charCount} Characters</span>
-          <span className="hidden sm:inline">English (United States)</span>
+          <span className="hidden md:inline">English (US)</span>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          <span className="hidden sm:inline">100% Lossless MS Word Rendering</span>
+          <span className="hidden md:inline">100% Lossless MS Word</span>
           <div className="flex items-center gap-1">
-            <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))} className="hover:opacity-80 p-0.5">-</button>
-            <span className="w-10 text-center">{zoomLevel}%</span>
-            <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))} className="hover:opacity-80 p-0.5">+</button>
+            <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))} className="hover:opacity-80 px-1 font-bold">-</button>
+            <span className="w-8 sm:w-10 text-center">{zoomLevel}%</span>
+            <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))} className="hover:opacity-80 px-1 font-bold">+</button>
           </div>
         </div>
       </div>

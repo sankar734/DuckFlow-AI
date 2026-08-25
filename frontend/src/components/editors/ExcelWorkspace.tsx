@@ -25,6 +25,7 @@ import {
   Eye,
   Layers,
   HelpCircle,
+  MoreVertical,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -61,6 +62,7 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
   const [showAIAnalyst, setShowAIAnalyst] = useState(false);
   const [isSaved, setIsSaved] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // New Workbook Modal
   const [isNewBookModalOpen, setIsNewBookModalOpen] = useState(false);
@@ -319,7 +321,7 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
   }));
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] rounded-3xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl">
+    <div className="flex flex-col h-[calc(100vh-9.5rem)] lg:h-[calc(100vh-6rem)] rounded-2xl sm:rounded-3xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl">
       {/* Hidden Spreadsheet File Picker */}
       <input
         type="file"
@@ -330,25 +332,25 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
       />
 
       {/* MS Excel Green Top Title Bar */}
-      <div className="flex items-center justify-between px-3 sm:px-5 py-2 bg-[#107c41] dark:bg-[#0b532c] text-white shadow-sm">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="p-1 rounded bg-white/10 flex items-center justify-center font-bold text-xs">
+      <div className="flex items-center justify-between px-2.5 sm:px-5 py-2 bg-[#107c41] dark:bg-[#0b532c] text-white shadow-sm select-none">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
+          <div className="p-1 sm:p-1.5 rounded-lg bg-white/10 flex items-center justify-center font-bold text-xs shrink-0">
             <TableIcon className="w-4 h-4 text-white" />
           </div>
           <input
             type="text"
             value={docName}
             onChange={(e) => setDocName(e.target.value)}
-            className="text-xs sm:text-sm font-bold bg-transparent border-b border-transparent hover:border-white/40 focus:border-white focus:outline-none px-1 text-white truncate max-w-[160px] sm:max-w-xs"
+            className="text-xs sm:text-sm font-bold bg-transparent border-b border-transparent hover:border-white/40 focus:border-white focus:outline-none px-1 text-white truncate max-w-[120px] xs:max-w-[170px] sm:max-w-xs"
           />
-          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-[10px] text-white/90">
+          <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] text-white/90 shrink-0">
             <FileCheck className="w-3 h-3 text-emerald-200" />
             {isSaved ? 'Synced to Cloud' : 'Unsaved edits'}
           </span>
         </div>
 
-        {/* Primary Header Action Buttons */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Desktop Header Action Buttons */}
+        <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 shrink-0">
           <Button
             variant="ghost"
             size="sm"
@@ -356,7 +358,7 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
             leftIcon={<FilePlus className="w-3.5 h-3.5" />}
           >
-            <span className="hidden sm:inline">New Sheet</span>
+            <span>New Sheet</span>
           </Button>
 
           <Button
@@ -366,7 +368,7 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
             leftIcon={<Upload className="w-3.5 h-3.5" />}
           >
-            <span className="hidden sm:inline">Import Excel</span>
+            <span>Import Excel</span>
           </Button>
 
           <Button
@@ -379,7 +381,7 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
             leftIcon={<Upload className="w-3.5 h-3.5 text-blue-200" />}
           >
-            <span className="hidden sm:inline">Drive Sync</span>
+            <span>Drive Sync</span>
           </Button>
 
           <Button
@@ -389,7 +391,7 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
             leftIcon={<Download className="w-3.5 h-3.5" />}
           >
-            <span className="hidden sm:inline">Export</span>
+            <span>Export</span>
           </Button>
 
           <Button
@@ -432,10 +434,109 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
             <span>AI Analyst</span>
           </Button>
         </div>
+
+        {/* Mobile Header Action Buttons (Never Overlapping) */}
+        <div className="flex sm:hidden items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              exportTableToPDF(headers, gridData, docName);
+              toast.success('Downloaded spreadsheet as PDF!');
+            }}
+            className="text-white hover:bg-white/10 text-xs px-2 bg-white/10"
+            leftIcon={<Printer className="w-3.5 h-3.5 text-amber-200" />}
+          >
+            <span>PDF</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAIAnalyst(!showAIAnalyst)}
+            className={`text-xs px-2 ${showAIAnalyst ? 'bg-purple-600 text-white shadow-glow' : 'text-emerald-100 hover:bg-white/10'}`}
+            leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />}
+          >
+            <span>AI</span>
+          </Button>
+
+          <div className="relative">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-1.5 rounded-lg text-white hover:bg-white/15 transition-colors"
+              title="More Actions"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {isMobileMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsMobileMenuOpen(false)} />
+                <div className="absolute right-0 mt-2 w-52 p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 animate-in fade-in duration-150 text-slate-800 dark:text-slate-100">
+                  <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase px-3 py-1">
+                    Spreadsheet Options
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsNewBookModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <FilePlus className="w-4 h-4 text-emerald-500" />
+                    <span>New Sheet</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      csvFileInputRef.current?.click();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Upload className="w-4 h-4 text-blue-500" />
+                    <span>Import Excel / CSV</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setShowChart(!showChart);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <BarChart2 className="w-4 h-4 text-amber-500" />
+                    <span>{showChart ? 'Hide Chart' : 'Show Chart'}</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsMobileMenuOpen(false);
+                      const csvContent = [headers.join(','), ...gridData.map((row) => row.join(','))].join('\n');
+                      await uploadToGoogleDrive(docName, csvContent, 'application/vnd.google-apps.spreadsheet');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Upload className="w-4 h-4 text-indigo-500" />
+                    <span>Drive Sync</span>
+                  </button>
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleExportCSV();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Download className="w-4 h-4 text-emerald-600" />
+                    <span>Export (.csv)</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* MS Excel Ribbon Navigation Tabs */}
-      <div className="flex items-center gap-1 px-2 sm:px-4 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto select-none">
+      <div className="no-scrollbar flex items-center gap-1 px-2 sm:px-4 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto whitespace-nowrap select-none py-1">
         {[
           { id: 'home', label: 'Home' },
           { id: 'insert', label: 'Insert' },
@@ -447,9 +548,9 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
           <button
             key={tab.id}
             onClick={() => setActiveRibbonTab(tab.id as any)}
-            className={`px-3 sm:px-4 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
+            className={`px-3 sm:px-4 py-1.5 rounded-lg border font-medium transition-all whitespace-nowrap ${
               activeRibbonTab === tab.id
-                ? 'border-[#107c41] text-[#107c41] dark:border-emerald-400 dark:text-emerald-400 bg-white dark:bg-slate-950 font-bold'
+                ? 'border-slate-300 dark:border-slate-700 text-[#107c41] dark:text-emerald-400 bg-white dark:bg-slate-800 font-bold shadow-xs'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >

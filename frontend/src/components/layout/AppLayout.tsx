@@ -19,7 +19,7 @@ export const AppLayout: React.FC = () => {
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <Navbar />
 
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-8 p-4 lg:p-8">
+        <main className="flex-1 overflow-y-auto pb-24 lg:pb-8 p-2 sm:p-4 lg:p-8">
           <div className="max-w-7xl mx-auto w-full">
             <Outlet />
           </div>

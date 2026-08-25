@@ -29,6 +29,7 @@ import {
   Quote,
   CheckCircle2,
   Sliders,
+  MoreVertical,
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
@@ -70,6 +71,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaved, setIsSaved] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Initial Presentation Slides
   const [slides, setSlides] = useState<Slide[]>([
@@ -266,6 +268,17 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
     }, 1200);
   };
 
+  const handleExportPresentation = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(slides, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', docName.replace(/\.pptx$/i, '') + '.json');
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    toast.success('Downloaded presentation deck!');
+  };
+
   // 8 Color Themes
   const themeStyles: Record<PowerPointTheme, string> = {
     slate: 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white',
@@ -279,31 +292,31 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] rounded-3xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl">
+    <div className="flex flex-col h-[calc(100vh-9.5rem)] lg:h-[calc(100vh-6rem)] rounded-2xl sm:rounded-3xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl">
       {/* Hidden File Pickers */}
       <input type="file" ref={imageInputRef} accept="image/*" onChange={(e) => handleAddImage(e.target.files)} className="hidden" />
       <input type="file" ref={pptFileInputRef} accept=".pptx,.ppt" onChange={(e) => handleImportPPT(e.target.files)} className="hidden" />
 
       {/* MS PowerPoint Top Bar */}
-      <div className="flex items-center justify-between px-3 sm:px-5 py-2 bg-[#d24726] dark:bg-[#a13217] text-white shadow-sm">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="p-1.5 rounded-lg bg-white/15 flex items-center justify-center font-bold text-xs shadow-xs">
+      <div className="flex items-center justify-between px-2.5 sm:px-5 py-2 bg-[#d24726] dark:bg-[#a13217] text-white shadow-sm select-none">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
+          <div className="p-1 sm:p-1.5 rounded-lg bg-white/15 flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
             <Presentation className="w-4 h-4 text-white" />
           </div>
           <input
             type="text"
             value={docName}
             onChange={(e) => setDocName(e.target.value)}
-            className="text-xs sm:text-sm font-bold bg-transparent border-b border-transparent hover:border-white/40 focus:border-white focus:outline-none px-1 text-white truncate max-w-[160px] sm:max-w-xs"
+            className="text-xs sm:text-sm font-bold bg-transparent border-b border-transparent hover:border-white/40 focus:border-white focus:outline-none px-1 text-white truncate max-w-[120px] xs:max-w-[170px] sm:max-w-xs"
           />
-          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-[10px] text-white/90">
+          <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] text-white/90 shrink-0">
             <FileCheck className="w-3 h-3 text-emerald-200" />
             {isSaved ? 'Saved to Cloud' : 'Unsaved edits'}
           </span>
         </div>
 
-        {/* Primary Action Buttons */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Desktop Primary Action Buttons */}
+        <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 shrink-0">
           <Button
             variant="ghost"
             size="sm"
@@ -311,7 +324,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3 bg-white/10"
             leftIcon={<FilePlus className="w-3.5 h-3.5 text-amber-200" />}
           >
-            <span className="hidden sm:inline">+ New Slide</span>
+            <span>+ New Slide</span>
           </Button>
 
           <Button
@@ -321,7 +334,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
             leftIcon={<Upload className="w-3.5 h-3.5" />}
           >
-            <span className="hidden sm:inline">Import PPT</span>
+            <span>Import PPT</span>
           </Button>
 
           <Button
@@ -334,7 +347,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
             className="text-white hover:bg-white/10 text-xs px-2 sm:px-3"
             leftIcon={<Upload className="w-3.5 h-3.5 text-blue-200" />}
           >
-            <span className="hidden sm:inline">Drive Sync</span>
+            <span>Drive Sync</span>
           </Button>
 
           <Button
@@ -373,10 +386,112 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
             <span>AI Deck</span>
           </Button>
         </div>
+
+        {/* Mobile Header Action Buttons (Never Overlapping) */}
+        <div className="flex sm:hidden items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsPlayingShow(true)}
+            className="text-white hover:bg-white/10 text-xs px-2 bg-white/10 font-bold"
+            leftIcon={<Play className="w-3.5 h-3.5 text-amber-200 fill-amber-200" />}
+          >
+            <span>Play</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              exportSlidesToPDF(
+                slides.map((s) => ({ title: s.title, subtitle: s.subtitle, content: s.bullets })),
+                docName
+              );
+              toast.success('Downloaded presentation as PDF!');
+            }}
+            className="text-white hover:bg-white/10 text-xs px-2 bg-white/10"
+            leftIcon={<Printer className="w-3.5 h-3.5 text-amber-200" />}
+          >
+            <span>PDF</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAIDeckModal(true)}
+            className="text-xs px-2 text-amber-200 hover:bg-white/10"
+            leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />}
+          >
+            <span>AI</span>
+          </Button>
+
+          <div className="relative">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-1.5 rounded-lg text-white hover:bg-white/15 transition-colors"
+              title="More Actions"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {isMobileMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsMobileMenuOpen(false)} />
+                <div className="absolute right-0 mt-2 w-52 p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 animate-in fade-in duration-150 text-slate-800 dark:text-slate-100">
+                  <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase px-3 py-1">
+                    Slide Options
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setShowLayoutModal(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <FilePlus className="w-4 h-4 text-rose-500" />
+                    <span>+ New Slide</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      pptFileInputRef.current?.click();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Upload className="w-4 h-4 text-blue-500" />
+                    <span>Import PPT</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsMobileMenuOpen(false);
+                      const pptContent = JSON.stringify(slides);
+                      await uploadToGoogleDrive(docName, pptContent, 'application/vnd.google-apps.presentation');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Upload className="w-4 h-4 text-indigo-500" />
+                    <span>Drive Sync</span>
+                  </button>
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleExportPresentation();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-left"
+                  >
+                    <Download className="w-4 h-4 text-rose-600" />
+                    <span>Download (.json/.pptx)</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* MS PowerPoint Ribbon Navigation Tabs */}
-      <div className="flex items-center gap-1 px-2 sm:px-4 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto select-none">
+      <div className="no-scrollbar flex items-center gap-1 px-2 sm:px-4 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto whitespace-nowrap select-none py-1">
         {[
           { id: 'home', label: 'Home' },
           { id: 'insert', label: 'Insert & Elements' },
@@ -387,9 +502,9 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
           <button
             key={tab.id}
             onClick={() => setActiveRibbonTab(tab.id as any)}
-            className={`px-3 sm:px-4 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
+            className={`px-3 sm:px-4 py-1.5 rounded-lg border font-medium transition-all whitespace-nowrap ${
               activeRibbonTab === tab.id
-                ? 'border-[#d24726] text-[#d24726] dark:border-rose-400 dark:text-rose-400 bg-white dark:bg-slate-950 font-bold'
+                ? 'border-slate-300 dark:border-slate-700 text-[#d24726] dark:text-rose-400 bg-white dark:bg-slate-800 font-bold shadow-xs'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -508,8 +623,8 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
 
       {/* Main Slide Editor Viewport */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Slide Thumbnails Pane */}
-        <div className="w-48 sm:w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto p-3 space-y-3">
+        {/* Left Slide Thumbnails Pane (Desktop) */}
+        <div className="hidden md:block w-52 lg:w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto p-3 space-y-3">
           <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase px-1">
             <span>Slides ({slides.length})</span>
             <button onClick={() => setShowLayoutModal(true)} className="text-[#d24726] hover:underline">
@@ -541,63 +656,92 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
         </div>
 
         {/* Central 16:9 Presentation Canvas Viewport */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8 flex flex-col items-center justify-center bg-slate-200/70 dark:bg-slate-950/90">
-          <div className={`w-full max-w-4xl aspect-video rounded-3xl p-8 sm:p-12 shadow-2xl flex flex-col justify-between transition-all ${themeStyles[activeSlide.theme]}`}>
+        <div className="flex-1 overflow-y-auto p-2 sm:p-6 lg:p-8 flex flex-col items-center justify-center bg-slate-200/70 dark:bg-slate-950/90 gap-3">
+          {/* Mobile Slide Navigation Bar */}
+          <div className="md:hidden flex items-center justify-between w-full max-w-4xl px-2 py-1 bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+            <button
+              onClick={() => setActiveSlideIndex(Math.max(0, activeSlideIndex - 1))}
+              disabled={activeSlideIndex === 0}
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="font-bold font-mono text-[11px]">
+              Slide {activeSlideIndex + 1} of {slides.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowLayoutModal(true)}
+                className="px-2 py-1 rounded bg-rose-500 text-white font-bold text-[10px] flex items-center gap-0.5"
+              >
+                <Plus className="w-3 h-3" /> Add
+              </button>
+              <button
+                onClick={() => setActiveSlideIndex(Math.min(slides.length - 1, activeSlideIndex + 1))}
+                disabled={activeSlideIndex === slides.length - 1}
+                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className={`w-full max-w-4xl aspect-video rounded-2xl sm:rounded-3xl p-4 sm:p-8 lg:p-12 shadow-2xl flex flex-col justify-between transition-all ${themeStyles[activeSlide.theme]}`}>
             {/* Title & Subtitle */}
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               <input
                 type="text"
                 value={activeSlide.title}
                 onChange={(e) => handleUpdateSlide({ title: e.target.value })}
-                className="w-full text-2xl sm:text-3xl font-extrabold bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:outline-none tracking-tight"
+                className="w-full text-lg sm:text-2xl lg:text-3xl font-extrabold bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:outline-none tracking-tight"
                 placeholder="Click to add presentation title..."
               />
               <input
                 type="text"
                 value={activeSlide.subtitle || ''}
                 onChange={(e) => handleUpdateSlide({ subtitle: e.target.value })}
-                className="w-full text-sm sm:text-base font-medium opacity-80 bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:outline-none"
+                className="w-full text-xs sm:text-sm lg:text-base font-medium opacity-80 bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:outline-none"
                 placeholder="Click to add subtitle..."
               />
             </div>
 
             {/* Special Layout Rendering: Stat / Quote / Bullets */}
             {activeSlide.layout === 'stat' ? (
-              <div className="my-6 p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-center space-y-2">
+              <div className="my-2 sm:my-6 p-3 sm:p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-center space-y-1 sm:space-y-2">
                 <input
                   type="text"
                   value={activeSlide.statNumber || '+350%'}
                   onChange={(e) => handleUpdateSlide({ statNumber: e.target.value })}
-                  className="w-full text-center text-4xl sm:text-5xl font-black bg-transparent border-none focus:outline-none"
+                  className="w-full text-center text-2xl sm:text-4xl lg:text-5xl font-black bg-transparent border-none focus:outline-none"
                 />
                 <input
                   type="text"
                   value={activeSlide.statLabel || 'Key Growth Performance'}
                   onChange={(e) => handleUpdateSlide({ statLabel: e.target.value })}
-                  className="w-full text-center text-xs sm:text-sm font-semibold opacity-80 bg-transparent border-none focus:outline-none"
+                  className="w-full text-center text-[10px] sm:text-xs lg:text-sm font-semibold opacity-80 bg-transparent border-none focus:outline-none"
                 />
               </div>
             ) : activeSlide.layout === 'quote' ? (
-              <div className="my-6 p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 italic space-y-3">
+              <div className="my-2 sm:my-6 p-3 sm:p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 italic space-y-2 sm:space-y-3">
                 <textarea
                   rows={2}
                   value={activeSlide.bullets[0] || 'Empowering seamless document transformation across the entire enterprise.'}
                   onChange={(e) => handleUpdateSlide({ bullets: [e.target.value] })}
-                  className="w-full text-base sm:text-xl font-serif bg-transparent border-none focus:outline-none leading-relaxed"
+                  className="w-full text-sm sm:text-base lg:text-xl font-serif bg-transparent border-none focus:outline-none leading-relaxed"
                 />
                 <input
                   type="text"
                   value={activeSlide.quoteAuthor || '— Executive Leadership'}
                   onChange={(e) => handleUpdateSlide({ quoteAuthor: e.target.value })}
-                  className="w-full text-right text-xs font-sans font-bold opacity-80 bg-transparent border-none focus:outline-none"
+                  className="w-full text-right text-[10px] sm:text-xs font-sans font-bold opacity-80 bg-transparent border-none focus:outline-none"
                 />
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4">
-                <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 my-2 sm:my-4">
+                <div className="space-y-2 sm:space-y-3">
                   {activeSlide.bullets.map((bullet, bIdx) => (
                     <div key={bIdx} className="flex items-start gap-2">
-                      <span className="font-bold text-lg mt-0.5">•</span>
+                      <span className="font-bold text-base sm:text-lg mt-0.5">•</span>
                       <input
                         type="text"
                         value={bullet}
@@ -613,7 +757,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
                 </div>
 
                 {activeSlide.imageUrl && (
-                  <div className="relative rounded-2xl overflow-hidden border border-white/10 max-h-48">
+                  <div className="relative rounded-2xl overflow-hidden border border-white/10 max-h-36 sm:max-h-48">
                     <img src={activeSlide.imageUrl} alt="Slide Visual" className="w-full h-full object-cover" />
                     <button
                       onClick={() => handleUpdateSlide({ imageUrl: undefined })}
@@ -627,7 +771,7 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-between text-[11px] opacity-70 border-t border-white/10 pt-3">
+            <div className="flex items-center justify-between text-[9px] sm:text-[11px] opacity-70 border-t border-white/10 pt-2 sm:pt-3">
               <span>DocuFlow AI Presentation Suite</span>
               <span>Slide {activeSlideIndex + 1} of {slides.length}</span>
             </div>
