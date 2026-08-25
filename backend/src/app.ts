@@ -75,7 +75,7 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/health', (req, res) => {
+const handleHealthCheck = (req: express.Request, res: express.Response) => {
   const isDbReady = mongoose.connection.readyState === 1;
   res.status(isDbReady ? 200 : 503).json({
     status: isDbReady ? 'ok' : 'degraded',
@@ -83,10 +83,15 @@ app.get('/health', (req, res) => {
     dbState: isDbReady ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
   });
-});
+};
 
-// API Routes
+app.get('/health', handleHealthCheck);
+app.get('/api/health', handleHealthCheck);
+app.get('/api/v1/health', handleHealthCheck);
+
+// API Routes (mounted under both /api and /api/v1)
 app.use('/api/v1', apiRoutes);
+app.use('/api', apiRoutes);
 
 // Centralized Error Handling
 app.use(errorHandler);
