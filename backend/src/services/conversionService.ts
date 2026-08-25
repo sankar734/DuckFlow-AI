@@ -10,16 +10,21 @@ export class ConversionService {
     fileSize?: number;
     documentId?: string;
   }) {
+    const srcFmt = data.sourceFormat.toUpperCase();
+    const tgtFmt = data.targetFormat.toUpperCase();
+    const cleanName = data.sourceFileName.replace(/\.[^/.]+$/, '');
+    const targetFileName = `${cleanName}.${tgtFmt.toLowerCase()}`;
+
     const job = await ConversionJob.create({
       userId: new mongoose.Types.ObjectId(userId),
       sourceFileName: data.sourceFileName,
-      sourceFormat: data.sourceFormat.toUpperCase(),
-      targetFormat: data.targetFormat.toUpperCase(),
-      fileSize: data.fileSize || 1024 * 50,
+      sourceFormat: srcFmt,
+      targetFormat: tgtFmt,
+      fileSize: data.fileSize || 1024 * 65,
       sourceDocumentId: data.documentId ? new mongoose.Types.ObjectId(data.documentId) : undefined,
       status: ConversionStatus.COMPLETED,
       progress: 100,
-      downloadUrl: `/storage/converted_${Date.now()}.${data.targetFormat.toLowerCase()}`,
+      downloadUrl: `/storage/converted_${Date.now()}_${targetFileName}`,
       completedAt: new Date(),
     });
 
@@ -36,7 +41,7 @@ export class ConversionService {
   }
 
   async getUserJobs(userId: string) {
-    return ConversionJob.find({ userId: new mongoose.Types.ObjectId(userId) }).sort({ createdAt: -1 }).limit(20);
+    return ConversionJob.find({ userId: new mongoose.Types.ObjectId(userId) }).sort({ createdAt: -1 }).limit(25);
   }
 }
 

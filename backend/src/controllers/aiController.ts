@@ -71,6 +71,26 @@ export class AIController {
     }
   }
 
+  async createArtifact(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { prompt, context, preferredFormat, slideCount, tone, audience } = req.body;
+      if (!prompt || typeof prompt !== 'string') {
+        throw new Error('Prompt is required');
+      }
+      const result = await aiService.createArtifact(req.user!._id.toString(), {
+        prompt,
+        context,
+        preferredFormat,
+        slideCount,
+        tone,
+        audience,
+      });
+      sendSuccess(res, result, 'Artifact generated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getCredits(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const result = await aiService.getCreditUsage(req.user!._id.toString());

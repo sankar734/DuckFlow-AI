@@ -286,8 +286,18 @@ export const convertFileToRealPDF = async (
   if (lowerName.endsWith('.docx') || lowerName.endsWith('.doc')) {
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const mammothOptions = {
+        convertImage: mammoth.images.imgElement((image: any) => {
+          return image.read('base64').then((imageBuffer: string) => {
+            return {
+              src: `data:${image.contentType || 'image/png'};base64,${imageBuffer}`,
+            };
+          });
+        }),
+      };
+
       const rawTextResult = await mammoth.extractRawText({ arrayBuffer });
-      const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
+      const htmlResult = await mammoth.convertToHtml({ arrayBuffer }, mammothOptions);
 
       const textContent = rawTextResult.value.trim() || 'Empty Document';
       const htmlContent = htmlResult.value.trim();
@@ -563,6 +573,27 @@ function generateFormattedDocumentPDF(
           });
           y += 6;
           continue;
+        }
+
+        // Image Element (Embedded DOCX / HTML Images)
+        const imgElement = tagName === 'img' ? (node as HTMLImageElement) : node.querySelector('img');
+        if (imgElement) {
+          const src = imgElement.getAttribute('src') || '';
+          if (src && (src.startsWith('data:image/') || src.startsWith('blob:') || src.startsWith('http'))) {
+            try {
+              checkPageOverflow(160);
+              const imgFormat = src.includes('image/png') || src.includes('.png') ? 'PNG' : 'JPEG';
+              const maxImgWidth = Math.min(contentWidth, 360);
+              const imgHeight = 180;
+              const imgX = align === 'center' ? (pageWidth - maxImgWidth) / 2 : align === 'right' ? pageWidth - margin - maxImgWidth : margin;
+
+              doc.addImage(src, imgFormat, imgX, y, maxImgWidth, imgHeight);
+              y += imgHeight + 14;
+              continue;
+            } catch (imgErr) {
+              console.warn('Non-fatal error adding image to PDF:', imgErr);
+            }
+          }
         }
 
         // Paragraphs & generic blocks

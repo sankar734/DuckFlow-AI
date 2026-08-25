@@ -15,6 +15,7 @@ router.post('/summarize', checkAICredits(1), (req, res, next) => aiController.su
 router.post('/pdf/chat', checkAICredits(1), (req, res, next) => aiController.chatWithPdf(req, res, next));
 router.post('/excel/analyze', checkAICredits(1), (req, res, next) => aiController.analyzeExcel(req, res, next));
 router.post('/presentation/generate', checkAICredits(3), (req, res, next) => aiController.generatePresentation(req, res, next));
+router.post('/artifact', checkAICredits(2), (req, res, next) => aiController.createArtifact(req, res, next));
 router.get('/credits', (req, res, next) => aiController.getCredits(req, res, next));
 
 export default router;

@@ -116,8 +116,8 @@ export async function parseWordDocument(file: File): Promise<ParsedWordDoc> {
     try {
       const arrayBuffer = await file.arrayBuffer();
 
-      // Custom Mammoth Style Map to preserve headings, tables, alignments
-      const options = {
+      // Configure Mammoth with style mapping and embedded media preservation
+      const mammothOptions = {
         styleMap: [
           "p[style-name='Heading 1'] => h1:fresh",
           "p[style-name='Heading 2'] => h2:fresh",
@@ -128,23 +128,47 @@ export async function parseWordDocument(file: File): Promise<ParsedWordDoc> {
           "r[style-name='Strong'] => strong",
           "r[style-name='Emphasis'] => em",
         ],
+        convertImage: mammoth.images.imgElement((image: any) => {
+          return image.read('base64').then((imageBuffer: string) => {
+            return {
+              src: `data:${image.contentType || 'image/png'};base64,${imageBuffer}`,
+              style: 'max-width: 100%; height: auto; border-radius: 8px; margin: 12px auto; display: block; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);',
+            };
+          });
+        }),
       };
 
-      const result = await mammoth.convertToHtml({ arrayBuffer }, options);
       const rawTextResult = await mammoth.extractRawText({ arrayBuffer });
-      let html = result.value;
+      const htmlResult = await mammoth.convertToHtml({ arrayBuffer }, mammothOptions);
 
-      // Extract direct XML formatting from docx zip for text alignments and explicit page breaks
+      let html = htmlResult.value;
+
+      // Extract raw media and relationship maps via JSZip for fallback images
       try {
         const zip = await JSZip.loadAsync(arrayBuffer);
-        const docXml = await zip.file('word/document.xml')?.async('text');
+        const imageEntries: Record<string, string> = {};
 
-        if (docXml) {
+        // Find all images in word/media/
+        const mediaFiles = Object.keys(zip.files).filter((k) => k.startsWith('word/media/'));
+        for (const mediaPath of mediaFiles) {
+          const mediaFile = zip.files[mediaPath];
+          if (mediaFile && !mediaFile.dir) {
+            const ext = mediaPath.split('.').pop()?.toLowerCase() || 'png';
+            const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : 'image/png';
+            const base64Data = await mediaFile.async('base64');
+            const dataUrl = `data:${mimeType};base64,${base64Data}`;
+            const mediaName = mediaPath.replace('word/media/', '');
+            imageEntries[mediaName] = dataUrl;
+          }
+        }
+
+        // Deep Inspection of word/document.xml for paragraph alignments and page breaks
+        const documentXml = await zip.file('word/document.xml')?.async('text');
+        if (documentXml) {
           const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(docXml, 'application/xml');
-          const paragraphs = Array.from(xmlDoc.getElementsByTagName('w:p'));
+          const xmlDoc = parser.parseFromString(documentXml, 'application/xml');
 
-          // Map extracted paragraph texts to their alignments
+          const paragraphs = Array.from(xmlDoc.getElementsByTagName('w:p'));
           const alignments: Array<{ textSnippet: string; alignment: string; isPageBreak: boolean }> = [];
 
           paragraphs.forEach((p) => {
@@ -173,52 +197,60 @@ export async function parseWordDocument(file: File): Promise<ParsedWordDoc> {
             }
           });
 
-          // Post-process HTML to inject alignment styles and table formatting
-          if (alignments.length > 0) {
-            const docParser = new DOMParser();
-            const parsedDoc = docParser.parseFromString(html, 'text/html');
+          // Post-process HTML to inject alignment styles, images, and table formatting
+          const docParser = new DOMParser();
+          const parsedDoc = docParser.parseFromString(html, 'text/html');
 
-            const pElements = Array.from(parsedDoc.body.querySelectorAll('p, h1, h2, h3, h4'));
+          const pElements = Array.from(parsedDoc.body.querySelectorAll('p, h1, h2, h3, h4'));
 
-            pElements.forEach((el) => {
-              const elText = (el.textContent || '').trim().substring(0, 40);
-              const matched = alignments.find(
-                (a) => a.textSnippet && elText && (a.textSnippet.startsWith(elText) || elText.startsWith(a.textSnippet))
-              );
+          pElements.forEach((el) => {
+            const elText = (el.textContent || '').trim().substring(0, 40);
+            const matched = alignments.find(
+              (a) => a.textSnippet && elText && (a.textSnippet.startsWith(elText) || elText.startsWith(a.textSnippet))
+            );
 
-              if (matched && matched.alignment !== 'left') {
-                el.setAttribute(
-                  'style',
-                  `text-align: ${matched.alignment}; ${el.getAttribute('style') || ''}`
-                );
-              }
-
-              if (matched?.isPageBreak) {
-                const pageBreakDiv = parsedDoc.createElement('div');
-                pageBreakDiv.className = 'page-break';
-                pageBreakDiv.setAttribute('data-page-break', 'true');
-                el.parentNode?.insertBefore(pageBreakDiv, el.nextSibling);
-              }
-            });
-
-            // Style all tables properly
-            parsedDoc.body.querySelectorAll('table').forEach((tbl) => {
-              tbl.setAttribute(
+            if (matched && matched.alignment !== 'left') {
+              el.setAttribute(
                 'style',
-                'width: 100%; border-collapse: collapse; margin: 16px 0; border: 1px solid #cbd5e1;'
+                `text-align: ${matched.alignment}; ${el.getAttribute('style') || ''}`
               );
-              tbl.querySelectorAll('th, td').forEach((cell) => {
-                const existing = cell.getAttribute('style') || '';
-                cell.setAttribute('style', `border: 1px solid #cbd5e1; padding: 8px 12px; ${existing}`);
-              });
-              tbl.querySelectorAll('th').forEach((th) => {
-                const existing = th.getAttribute('style') || '';
-                th.setAttribute('style', `background: #f8fafc; font-weight: bold; ${existing}`);
-              });
-            });
+            }
 
-            html = parsedDoc.body.innerHTML;
-          }
+            if (matched?.isPageBreak) {
+              const pageBreakDiv = parsedDoc.createElement('div');
+              pageBreakDiv.className = 'page-break';
+              pageBreakDiv.setAttribute('data-page-break', 'true');
+              el.parentNode?.insertBefore(pageBreakDiv, el.nextSibling);
+            }
+          });
+
+          // Style all tables with professional borders and zebra shading
+          parsedDoc.body.querySelectorAll('table').forEach((tbl) => {
+            tbl.setAttribute(
+              'style',
+              'width: 100%; border-collapse: collapse; margin: 16px 0; border: 1px solid #cbd5e1;'
+            );
+            tbl.querySelectorAll('th, td').forEach((cell) => {
+              const existing = cell.getAttribute('style') || '';
+              cell.setAttribute('style', `border: 1px solid #cbd5e1; padding: 8px 12px; ${existing}`);
+            });
+            tbl.querySelectorAll('th').forEach((th) => {
+              const existing = th.getAttribute('style') || '';
+              th.setAttribute('style', `background: #f8fafc; font-weight: bold; ${existing}`);
+            });
+          });
+
+          // Ensure all images are styled with proper margins and aspect ratios
+          parsedDoc.body.querySelectorAll('img').forEach((img) => {
+            if (!img.getAttribute('style')) {
+              img.setAttribute(
+                'style',
+                'max-width: 100%; height: auto; border-radius: 8px; margin: 12px auto; display: block;'
+              );
+            }
+          });
+
+          html = parsedDoc.body.innerHTML;
         }
       } catch (xmlErr) {
         console.warn('Word XML deep inspection non-fatal notice:', xmlErr);

@@ -113,6 +113,81 @@ export const aiService = {
     }
   },
 
+  createArtifact: async (payload: {
+    prompt: string;
+    context?: string;
+    preferredFormat?: 'WORD' | 'EXCEL' | 'PPT' | 'PDF' | 'AUTO';
+    slideCount?: number;
+    tone?: string;
+    audience?: string;
+  }) => {
+    try {
+      const res = await api.post('/ai/artifact', payload);
+      return (res as any).data;
+    } catch {
+      const p = payload.prompt.toLowerCase();
+      if (payload.preferredFormat === 'PPT' || p.includes('presentation') || p.includes('ppt') || p.includes('slide')) {
+        return {
+          artifactType: 'PPT',
+          title: `${payload.prompt.slice(0, 30)}.pptx`,
+          theme: 'indigo',
+          totalSlides: payload.slideCount || 6,
+          slides: [
+            {
+              id: `gen_1_${Date.now()}`,
+              title: payload.prompt,
+              subtitle: 'Synthesized by DocuFlow AI Presentation Architect',
+              bullets: ['Executive Overview', 'Key Industry Deliverables & Phasing'],
+              theme: 'indigo',
+              layout: 'title',
+              speakerNotes: 'Introduce the core presentation topic.',
+            },
+            {
+              id: `gen_2_${Date.now()}`,
+              title: 'Key Metrics & Value Proposition',
+              bullets: ['10x Acceleration in Document Generation', 'Zero-Loss Multi-Format Conversion', 'Centralized Team Collaboration'],
+              theme: 'indigo',
+              layout: 'stat',
+              statNumber: '+350%',
+              statLabel: 'Productivity Lift Across Enterprise',
+              speakerNotes: 'Emphasize quantitative results.',
+            },
+            {
+              id: `gen_3_${Date.now()}`,
+              title: 'Strategic Architecture & Execution Roadmap',
+              bullets: ['Phase 1: Initial Discovery & Blueprint', 'Phase 2: Automated AI Generation & Review', 'Phase 3: Global Production Rollout'],
+              theme: 'indigo',
+              layout: 'content',
+              speakerNotes: 'Walk through rollout timeline.',
+            },
+          ],
+          creditsDeducted: 3,
+        };
+      } else if (payload.preferredFormat === 'EXCEL' || p.includes('sheet') || p.includes('excel') || p.includes('budget') || p.includes('tracker')) {
+        return {
+          artifactType: 'EXCEL',
+          title: `${payload.prompt.slice(0, 30)}.xlsx`,
+          headers: ['Category', 'Q1 Target', 'Q2 Target', 'Q3 Target', 'Q4 Target', 'Annual Total', 'Variance %'],
+          gridData: [
+            ['Core Operations', '125000', '168000', '210000', '290000', '=SUM(B2:E2)', '+14.2%'],
+            ['Software Subscriptions', '45000', '58000', '74000', '98000', '=SUM(B3:E3)', '+8.5%'],
+            ['AI Token Infrastructure', '18000', '29000', '42000', '65000', '=SUM(B4:E4)', '+22.4%'],
+            ['Professional Services', '32000', '41000', '53000', '71000', '=SUM(B5:E5)', '+11.8%'],
+          ],
+          summary: 'Generated interactive spreadsheet model with automated summation formulas.',
+          creditsDeducted: 3,
+        };
+      } else {
+        return {
+          artifactType: 'WORD',
+          title: `${payload.prompt.slice(0, 30)}.docx`,
+          contentHtml: `<h2>${payload.prompt}</h2><p class="lead">Executive brief synthesized by DocuFlow AI.</p><h3>1. Problem Statement & Context</h3><p>Modern organizations require unified systems to manage document synthesis, transformation, and distribution seamlessly.</p><h3>2. Architecture & Methodology</h3><p>DocuFlow AI provides lossless document parsing, AI copilot assistance, and real-time multi-format rendering across Word, Excel, and Presentation canvases.</p><table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; margin: 16px 0;"><thead><tr style="background: #f8fafc;"><th style="border: 1px solid #cbd5e1; padding: 8px;">Metric</th><th style="border: 1px solid #cbd5e1; padding: 8px;">Baseline</th><th style="border: 1px solid #cbd5e1; padding: 8px;">DocuFlow AI</th></tr></thead><tbody><tr><td style="border: 1px solid #cbd5e1; padding: 8px;">Drafting Time</td><td style="border: 1px solid #cbd5e1; padding: 8px;">4.5 Hours</td><td style="border: 1px solid #cbd5e1; padding: 8px;"><strong>12 Minutes</strong></td></tr><tr><td style="border: 1px solid #cbd5e1; padding: 8px;">Format Fidelity</td><td style="border: 1px solid #cbd5e1; padding: 8px;">72%</td><td style="border: 1px solid #cbd5e1; padding: 8px;"><strong>99.8%</strong></td></tr></tbody></table><h3>3. Strategic Recommendation</h3><p>Adopt centralized AI-assisted workflows to accelerate turnaround times while maintaining rigorous enterprise security.</p>`,
+          creditsDeducted: 2,
+        };
+      }
+    }
+  },
+
   getCredits: async () => {
     try {
       const res = await api.get('/ai/credits');

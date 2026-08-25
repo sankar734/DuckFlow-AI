@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Table as TableIcon,
   Plus,
@@ -80,6 +80,26 @@ export const ExcelWorkspace: React.FC<{ initialDocName?: string }> = ({
     ['Net Gross Margin', '186000', '256000', '314000', '442000', '1198000', '52%', '+14.5%'],
     ['Operating Expenses', '62000', '71000', '84000', '95000', '312000', '22%', '+3.4%'],
   ]);
+
+  useEffect(() => {
+    try {
+      const savedDraft = localStorage.getItem('docuflow_active_excel_draft');
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.headers && Array.isArray(parsed.headers)) {
+          setHeaders(parsed.headers);
+        }
+        if (parsed.gridData && Array.isArray(parsed.gridData)) {
+          setGridData(parsed.gridData);
+        }
+        if (parsed.title) {
+          setDocName(parsed.title);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not parse excel draft:', e);
+    }
+  }, []);
 
   const handleCellChange = (r: number, c: number, val: string) => {
     const updated = [...gridData];

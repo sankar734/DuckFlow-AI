@@ -118,6 +118,25 @@ export const PowerPointBuilder: React.FC<{ initialDocName?: string }> = ({
     },
   ]);
 
+  useEffect(() => {
+    try {
+      const savedDraft = localStorage.getItem('docuflow_active_ppt_draft');
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSlides(parsed);
+          setActiveSlideIndex(0);
+        } else if (parsed.slides && Array.isArray(parsed.slides)) {
+          setSlides(parsed.slides);
+          if (parsed.title) setDocName(parsed.title);
+          setActiveSlideIndex(0);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not parse ppt draft:', e);
+    }
+  }, []);
+
   const activeSlide = slides[activeSlideIndex] || slides[0];
 
   const handleUpdateSlide = (updatedFields: Partial<Slide>) => {
