@@ -17,7 +17,7 @@ import {
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { DocumentPreviewModal } from '../../components/documents/DocumentPreviewModal';
-import { createConvertedPDFBlob } from '../../utils/pdfGenerator';
+import { convertFileToRealPDF, ConvertedPDFResult } from '../../utils/pdfGenerator';
 import { toast } from 'sonner';
 
 interface ConversionQueueItem {
@@ -31,6 +31,10 @@ interface ConversionQueueItem {
   progress: number;
   downloadUrl?: string;
   pdfBlob?: Blob;
+  extractedText?: string;
+  htmlContent?: string;
+  tableData?: { headers: string[]; rows: string[][] };
+  slides?: Array<{ title: string; subtitle?: string; content: string[] }>;
 }
 
 export const ConverterPage: React.FC = () => {
@@ -39,34 +43,7 @@ export const ConverterPage: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [previewItem, setPreviewItem] = useState<ConversionQueueItem | null>(null);
 
-  // Initialize demo items with real PDF blobs
-  const initialPdf1 = createConvertedPDFBlob('Annual_Strategy_Report_2026.docx', 'DOCX');
-  const initialPdf2 = createConvertedPDFBlob('Customer_Acquisition_Analysis.xlsx', 'XLSX');
-
-  const [queue, setQueue] = useState<ConversionQueueItem[]>([
-    {
-      id: 'demo_1',
-      fileName: 'Annual_Strategy_Report_2026.docx',
-      size: '1.4 MB',
-      sourceFormat: 'DOCX',
-      targetFormat: 'PDF',
-      status: 'COMPLETED',
-      progress: 100,
-      downloadUrl: initialPdf1.url,
-      pdfBlob: initialPdf1.blob,
-    },
-    {
-      id: 'demo_2',
-      fileName: 'Customer_Acquisition_Analysis.xlsx',
-      size: '840 KB',
-      sourceFormat: 'XLSX',
-      targetFormat: 'PDF',
-      status: 'COMPLETED',
-      progress: 100,
-      downloadUrl: initialPdf2.url,
-      pdfBlob: initialPdf2.blob,
-    },
-  ]);
+  const [queue, setQueue] = useState<ConversionQueueItem[]>([]);
   const [isConvertingAll, setIsConvertingAll] = useState(false);
 
   const formatFileSize = (bytes: number) => {
@@ -98,76 +75,102 @@ export const ConverterPage: React.FC = () => {
     });
 
     setQueue((prev) => [...newItems, ...prev]);
-    toast.success(`${files.length} file(s) selected from folder!`);
+    toast.success(`${files.length} file(s) added to queue! Ready to convert.`);
   };
 
-  const handleConvertItem = (id: string) => {
+  const handleConvertItem = async (id: string) => {
+    const item = queue.find((q) => q.id === id);
+    if (!item) return;
+
     setQueue((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, status: 'CONVERTING', progress: 30 } : item
-      )
+      prev.map((it) => (it.id === id ? { ...it, status: 'CONVERTING', progress: 40 } : it))
     );
 
-    setTimeout(() => {
+    try {
+      if (item.file) {
+        const result: ConvertedPDFResult = await convertFileToRealPDF(item.file, item.targetFormat);
+        setQueue((prev) =>
+          prev.map((it) => {
+            if (it.id === id) {
+              return {
+                ...it,
+                status: 'COMPLETED',
+                progress: 100,
+                downloadUrl: result.url,
+                pdfBlob: result.blob,
+                extractedText: result.extractedText,
+                htmlContent: result.htmlContent,
+                tableData: result.tableData,
+                slides: result.slides,
+              };
+            }
+            return it;
+          })
+        );
+        toast.success(`Converted "${item.fileName}" into authentic PDF with real content!`);
+      }
+    } catch (err: any) {
+      console.error('Conversion error:', err);
+      toast.error(`Error converting ${item.fileName}`);
       setQueue((prev) =>
-        prev.map((item) => {
-          if (item.id === id) {
-            // Generate authentic styled PDF with visible content
-            const pdf = createConvertedPDFBlob(item.fileName, item.sourceFormat);
-            return {
-              ...item,
-              status: 'COMPLETED',
-              progress: 100,
-              downloadUrl: pdf.url,
-              pdfBlob: pdf.blob,
-            };
-          }
-          return item;
-        })
+        prev.map((it) => (it.id === id ? { ...it, status: 'PENDING', progress: 0 } : it))
       );
-      toast.success(`Converted ${queue.find((q) => q.id === id)?.fileName} successfully!`);
-    }, 1200);
+    }
   };
 
-  const handleConvertAll = () => {
+  const handleConvertAll = async () => {
     setIsConvertingAll(true);
     setQueue((prev) =>
       prev.map((item) =>
-        item.status === 'PENDING' ? { ...item, status: 'CONVERTING', progress: 50 } : item
+        item.status === 'PENDING' ? { ...item, status: 'CONVERTING', progress: 30 } : item
       )
     );
 
-    setTimeout(() => {
-      setQueue((prev) =>
-        prev.map((item) => {
-          const pdf = createConvertedPDFBlob(item.fileName, item.sourceFormat);
-          return {
-            ...item,
-            status: 'COMPLETED',
-            progress: 100,
-            downloadUrl: pdf.url,
-            pdfBlob: pdf.blob,
-          };
-        })
-      );
-      setIsConvertingAll(false);
-      toast.success('All files converted to PDF with visible content!');
-    }, 1500);
+    const pendingItems = queue.filter((q) => q.status === 'PENDING' || q.status === 'CONVERTING');
+
+    for (const item of pendingItems) {
+      if (item.file) {
+        try {
+          const result = await convertFileToRealPDF(item.file, item.targetFormat);
+          setQueue((prev) =>
+            prev.map((it) => {
+              if (it.id === item.id) {
+                return {
+                  ...it,
+                  status: 'COMPLETED',
+                  progress: 100,
+                  downloadUrl: result.url,
+                  pdfBlob: result.blob,
+                  extractedText: result.extractedText,
+                  htmlContent: result.htmlContent,
+                  tableData: result.tableData,
+                  slides: result.slides,
+                };
+              }
+              return it;
+            })
+          );
+        } catch (err) {
+          console.error(`Failed to convert ${item.fileName}`, err);
+        }
+      }
+    }
+
+    setIsConvertingAll(false);
+    toast.success('All files converted with full original content preserved!');
   };
 
   const handleDownload = (item: ConversionQueueItem) => {
     const baseName = item.fileName.substring(0, item.fileName.lastIndexOf('.')) || item.fileName;
-    const targetExt = item.targetFormat.toLowerCase();
-    const downloadName = `${baseName}.${targetExt}`;
+    const downloadName = `${baseName}.pdf`;
 
-    let blobUrl = item.downloadUrl;
-    if (!blobUrl || blobUrl === '#') {
-      const pdf = createConvertedPDFBlob(item.fileName, item.sourceFormat);
-      blobUrl = pdf.url;
+    if (!item.downloadUrl) {
+      toast.error('Please convert file first');
+      return;
     }
 
     const link = document.createElement('a');
-    link.href = blobUrl;
+    link.href = item.downloadUrl;
     link.download = downloadName;
     document.body.appendChild(link);
     link.click();
@@ -378,7 +381,7 @@ export const ConverterPage: React.FC = () => {
         )}
       </div>
 
-      {/* Document & PDF Visible Content Previewer */}
+      {/* Document & PDF Real Content Previewer */}
       {previewItem && (
         <DocumentPreviewModal
           isOpen={!!previewItem}
@@ -386,9 +389,13 @@ export const ConverterPage: React.FC = () => {
           title={previewItem.fileName}
           sourceFormat={previewItem.sourceFormat}
           pdfUrl={previewItem.downloadUrl}
-          content={`DocuFlow AI Verified Output: ${previewItem.fileName} was successfully processed and converted to ${previewItem.targetFormat}. All text, styles, and tables are 100% visible and preserved.`}
+          content={previewItem.extractedText}
+          htmlContent={previewItem.htmlContent}
+          tableData={previewItem.tableData}
+          slides={previewItem.slides}
         />
       )}
+
     </div>
   );
 };

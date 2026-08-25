@@ -116,3 +116,66 @@
     color: #000000 !important;
   }
 }
+
+/* Document Formatting & Alignment Rules (Preserves MS Word Layout) */
+.document-content [style*="text-align: center"],
+.prose [style*="text-align: center"],
+[style*="text-align: center"] {
+  text-align: center !important;
+}
+
+.document-content [style*="text-align: right"],
+.prose [style*="text-align: right"],
+[style*="text-align: right"] {
+  text-align: right !important;
+}
+
+.document-content [style*="text-align: justify"],
+.prose [style*="text-align: justify"],
+[style*="text-align: justify"] {
+  text-align: justify !important;
+  text-justify: inter-word;
+}
+
+.document-content table,
+.prose table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 1.25em 0 !important;
+}
+
+.document-content table th,
+.document-content table td,
+.prose table th,
+.prose table td {
+  border: 1px solid #cbd5e1 !important;
+  padding: 8px 12px !important;
+}
+
+.document-content table th,
+.prose table th {
+  background-color: #f8fafc !important;
+  font-weight: 700 !important;
+}
+
+.dark .document-content table th,
+.dark .document-content table td,
+.dark .prose table th,
+.dark .prose table td {
+  border-color: #334155 !important;
+}
+
+.dark .document-content table th,
+.dark .prose table th {
+  background-color: #1e293b !important;
+}
+
+/* Horizontal scrollbar utility for mobile ribbons */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
+import fs from 'fs';
 import mongoose from 'mongoose';
 import { env } from './config/env';
 import { connectDatabase, disconnectDatabase } from './config/database';
@@ -53,6 +54,10 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request Logging
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// Ensure storage and uploads directories exist
+fs.mkdirSync(path.join(process.cwd(), 'uploads'), { recursive: true });
+fs.mkdirSync(path.join(process.cwd(), 'storage'), { recursive: true });
 
 // Static directories for uploads and storage
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));

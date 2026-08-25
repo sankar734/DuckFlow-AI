@@ -23,7 +23,7 @@ import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { DocumentPreviewModal } from '../../components/documents/DocumentPreviewModal';
-import { createConvertedPDFBlob } from '../../utils/pdfGenerator';
+import { convertFileToRealPDF, ConvertedPDFResult } from '../../utils/pdfGenerator';
 import { toast } from 'sonner';
 
 interface ToolItem {
@@ -44,7 +44,7 @@ export const PDFToolsPage: React.FC = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [processedPdfData, setProcessedPdfData] = useState<{ blob: Blob; url: string } | null>(null);
+  const [processedResult, setProcessedResult] = useState<ConvertedPDFResult | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Tool specific options
@@ -79,7 +79,7 @@ export const PDFToolsPage: React.FC = () => {
     setSelectedFile(null);
     setIsCompleted(false);
     setIsExecuting(false);
-    setProcessedPdfData(null);
+    setProcessedResult(null);
     setPasswordInput('');
   };
 
@@ -87,42 +87,52 @@ export const PDFToolsPage: React.FC = () => {
     if (files && files.length > 0) {
       setSelectedFile(files[0]);
       setIsCompleted(false);
-      setProcessedPdfData(null);
+      setProcessedResult(null);
       toast.success(`Selected "${files[0].name}"`);
     }
   };
 
-  const handleProcess = () => {
+  const handleProcess = async () => {
     if (!selectedFile) {
       toast.error('Please choose a file from your computer first.');
       return;
     }
 
     setIsExecuting(true);
-    setTimeout(() => {
-      // Create real visible PDF
-      const pdf = createConvertedPDFBlob(selectedFile.name, selectedTool?.name || 'PDF Tool');
-      setProcessedPdfData(pdf);
+
+    try {
+      const options = {
+        watermarkText: selectedTool?.id === 'watermark_pdf' ? watermarkText : undefined,
+        rotationAngle: selectedTool?.id === 'rotate_pdf' ? parseInt(rotationAngle, 10) : undefined,
+      };
+
+      const result = await convertFileToRealPDF(selectedFile, selectedTool?.outputExt || 'PDF', options);
+      setProcessedResult(result);
       setIsExecuting(false);
       setIsCompleted(true);
-      toast.success(`Processed "${selectedFile.name}" with ${selectedTool?.name}!`);
-    }, 1400);
+      toast.success(`Processed "${selectedFile.name}" with real content preserved!`);
+    } catch (err: any) {
+      console.error('Processing error:', err);
+      toast.error('Error processing document');
+      setIsExecuting(false);
+    }
   };
 
   const handleDownloadResult = () => {
-    if (!selectedFile || !selectedTool || !processedPdfData) return;
+    if (!selectedFile || !selectedTool || !processedResult) return;
     const base = selectedFile.name.substring(0, selectedFile.name.lastIndexOf('.')) || selectedFile.name;
     const ext = selectedTool.outputExt || 'pdf';
     const outputName = `${base}_${selectedTool.id}.${ext}`;
 
     const link = document.createElement('a');
-    link.href = processedPdfData.url;
+    link.href = processedResult.url;
     link.download = outputName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     toast.success(`Downloaded ${outputName}`);
   };
+
 
   return (
     <div className="space-y-8">
@@ -350,10 +360,14 @@ export const PDFToolsPage: React.FC = () => {
           onClose={() => setIsPreviewOpen(false)}
           title={`${selectedFile.name.replace(/\.[^/.]+$/, '')}_${selectedTool.id}.pdf`}
           sourceFormat={selectedTool.name}
-          pdfUrl={processedPdfData?.url}
-          content={`DocuFlow AI Processed Document:\n\n• Source Document: ${selectedFile.name}\n• Tool Applied: ${selectedTool.name}\n• Status: Processed with Lossless Quality\n• Timestamp: ${new Date().toLocaleString()}`}
+          pdfUrl={processedResult?.url}
+          content={processedResult?.extractedText}
+          htmlContent={processedResult?.htmlContent}
+          tableData={processedResult?.tableData}
+          slides={processedResult?.slides}
         />
       )}
+
     </div>
   );
 };

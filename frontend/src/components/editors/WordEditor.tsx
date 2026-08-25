@@ -869,7 +869,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                     fontSize,
                     lineHeight: lineSpacing,
                   }}
-                  className={`prose max-w-none min-h-[880px] focus:outline-none leading-relaxed ${
+                  className={`document-content prose max-w-none min-h-[880px] focus:outline-none leading-relaxed ${
                     isDarkModePaper ? 'prose-invert text-slate-100' : 'text-slate-900'
                   }`}
                 />
