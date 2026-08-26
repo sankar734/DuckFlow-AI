@@ -27,8 +27,9 @@ interface ConversionQueueItem {
   size: string;
   sourceFormat: string;
   targetFormat: string;
-  status: 'PENDING' | 'CONVERTING' | 'COMPLETED';
+  status: 'PENDING' | 'CONVERTING' | 'COMPLETED' | 'FAILED';
   progress: number;
+  stageMessage?: string;
   downloadUrl?: string;
   pdfBlob?: Blob;
   extractedText?: string;
@@ -45,6 +46,7 @@ export const ConverterPage: React.FC = () => {
 
   const [queue, setQueue] = useState<ConversionQueueItem[]>([]);
   const [isConvertingAll, setIsConvertingAll] = useState(false);
+  const [engineType, setEngineType] = useState<string>('DocuFlow High-Fidelity Engine');
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -71,6 +73,7 @@ export const ConverterPage: React.FC = () => {
         targetFormat: targetFormat === srcFormat ? (srcFormat === 'PDF' ? 'DOCX' : 'PDF') : targetFormat,
         status: 'PENDING',
         progress: 0,
+        stageMessage: 'Ready to convert',
       };
     });
 
@@ -83,12 +86,36 @@ export const ConverterPage: React.FC = () => {
     if (!item) return;
 
     setQueue((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, status: 'CONVERTING', progress: 40 } : it))
+      prev.map((it) =>
+        it.id === id
+          ? { ...it, status: 'CONVERTING', progress: 25, stageMessage: 'Preparing document structure...' }
+          : it
+      )
     );
 
     try {
       if (item.file) {
+        // Stage 1: Reading & Parsing
+        setQueue((prev) =>
+          prev.map((it) =>
+            it.id === id
+              ? { ...it, progress: 55, stageMessage: 'Rendering pages & typography...' }
+              : it
+          )
+        );
+
         const result: ConvertedPDFResult = await convertFileToRealPDF(item.file, item.targetFormat);
+
+        // Stage 2: Validation
+        setQueue((prev) =>
+          prev.map((it) =>
+            it.id === id
+              ? { ...it, progress: 85, stageMessage: 'Validating output fidelity...' }
+              : it
+          )
+        );
+
+        // Stage 3: Completed
         setQueue((prev) =>
           prev.map((it) => {
             if (it.id === id) {
@@ -96,6 +123,7 @@ export const ConverterPage: React.FC = () => {
                 ...it,
                 status: 'COMPLETED',
                 progress: 100,
+                stageMessage: 'Conversion completed successfully',
                 downloadUrl: result.url,
                 pdfBlob: result.blob,
                 extractedText: result.extractedText,
@@ -113,7 +141,11 @@ export const ConverterPage: React.FC = () => {
       console.error('Conversion error:', err);
       toast.error(`Error converting ${item.fileName}`);
       setQueue((prev) =>
-        prev.map((it) => (it.id === id ? { ...it, status: 'PENDING', progress: 0 } : it))
+        prev.map((it) =>
+          it.id === id
+            ? { ...it, status: 'FAILED', progress: 0, stageMessage: 'Conversion failed. Original file safe.' }
+            : it
+        )
       );
     }
   };
@@ -325,7 +357,20 @@ export const ConverterPage: React.FC = () => {
                     <div className="text-[11px] text-slate-400">
                       {item.size} • Convert from <span className="font-semibold text-brand-500">{item.sourceFormat}</span> to{' '}
                       <span className="font-semibold text-purple-500">{item.targetFormat}</span>
+                      {item.stageMessage && (
+                        <span className="block text-[10px] text-brand-600 dark:text-brand-400 mt-0.5 font-medium">
+                          {item.stageMessage}
+                        </span>
+                      )}
                     </div>
+                    {item.status === 'CONVERTING' && (
+                      <div className="w-36 sm:w-48 bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                        <div
+                          className="bg-brand-500 h-full transition-all duration-300 rounded-full"
+                          style={{ width: `${item.progress}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

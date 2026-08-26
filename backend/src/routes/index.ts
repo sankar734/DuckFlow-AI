@@ -9,6 +9,7 @@ import {
   billingRouter,
   adminRouter,
   platformRouter,
+  systemRouter,
 } from './otherRoutes';
 
 const router = Router();
@@ -18,6 +19,7 @@ router.use('/documents', documentRoutes);
 router.use('/ai', aiRoutes);
 router.use('/pdf', pdfRouter);
 router.use('/conversions', conversionRouter);
+router.use('/system', systemRouter);
 router.use('/ocr', ocrRouter);
 router.use('/billing', billingRouter);
 router.use('/admin', adminRouter);

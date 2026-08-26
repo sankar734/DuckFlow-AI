@@ -19,8 +19,14 @@ pdfRouter.post('/:tool', (req, res, next) => pdfController.processTool(req, res,
 // Conversion Router
 export const conversionRouter = Router();
 conversionRouter.use(authenticate);
+conversionRouter.get('/health', (req, res, next) => conversionController.getHealth(req as any, res, next));
+conversionRouter.get('/:jobId', (req, res, next) => conversionController.getJobById(req as any, res, next));
 conversionRouter.post('/', (req, res, next) => conversionController.convert(req, res, next));
 conversionRouter.get('/', (req, res, next) => conversionController.getJobs(req, res, next));
+
+// System Health Router
+export const systemRouter = Router();
+systemRouter.get('/converter-health', (req, res, next) => conversionController.getHealth(req as any, res, next));
 
 // OCR Router
 export const ocrRouter = Router();

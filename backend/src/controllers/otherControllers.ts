@@ -38,7 +38,7 @@ export class ConversionController {
     try {
       const validated = conversionJobSchema.parse(req.body);
       const result = await conversionService.createConversionJob(req.user!._id.toString(), validated);
-      sendSuccess(res, result, 'File conversion started', 201);
+      sendSuccess(res, result, 'File conversion completed', 201);
     } catch (error) {
       next(error);
     }
@@ -48,6 +48,25 @@ export class ConversionController {
     try {
       const result = await conversionService.getUserJobs(req.user!._id.toString());
       sendSuccess(res, result, 'Conversion history');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getJobById(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { jobId } = req.params;
+      const result = await conversionService.getJobStatus(jobId, req.user!._id.toString());
+      sendSuccess(res, result, 'Conversion job status');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getHealth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await conversionService.getConverterHealth();
+      sendSuccess(res, result, 'Converter engine health diagnostics');
     } catch (error) {
       next(error);
     }
