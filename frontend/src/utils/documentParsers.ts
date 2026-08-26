@@ -1,12 +1,18 @@
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
+import { docxDeepParser, DeepParsedWordDocument, DeepParsedSection } from './docxDeepParser';
 
 export interface ParsedWordDoc {
   html: string;
   pages: string[];
   text: string;
   title: string;
+  sectionSetup?: DeepParsedSection;
+  declaredFonts?: string[];
+  pageCount?: number;
+  imageCount?: number;
+  tableCount?: number;
 }
 
 export interface ParsedSpreadsheet {
@@ -115,164 +121,37 @@ export async function parseWordDocument(file: File): Promise<ParsedWordDoc> {
   if (isDocx) {
     try {
       const arrayBuffer = await file.arrayBuffer();
-
-      // Configure Mammoth with style mapping and embedded media preservation
+      // Primary: OOXML Deep Parser for exact typography, margins, and media
+      const deepParsed = await docxDeepParser.parse(arrayBuffer, fileName);
+      return {
+        html: deepParsed.fullHtml,
+        pages: deepParsed.pages.map((p) => p.contentHtml),
+        text: deepParsed.plainText,
+        title: fileName,
+        sectionSetup: deepParsed.sectionSetup,
+        declaredFonts: deepParsed.declaredFonts,
+        pageCount: deepParsed.pageCount,
+        imageCount: deepParsed.imageCount,
+        tableCount: deepParsed.tableCount,
+      };
+    } catch (deepErr) {
+      console.warn('DocxDeepParser fallback to Mammoth parser:', deepErr);
+      const arrayBuffer = await file.arrayBuffer();
       const mammothOptions = {
-        styleMap: [
-          "p[style-name='Heading 1'] => h1:fresh",
-          "p[style-name='Heading 2'] => h2:fresh",
-          "p[style-name='Heading 3'] => h3:fresh",
-          "p[style-name='Title'] => h1.doc-title:fresh",
-          "p[style-name='Subtitle'] => p.doc-subtitle:fresh",
-          "table => table.doc-table:fresh",
-          "r[style-name='Strong'] => strong",
-          "r[style-name='Emphasis'] => em",
-        ],
         convertImage: mammoth.images.imgElement((image: any) => {
           return image.read('base64').then((imageBuffer: string) => {
             return {
               src: `data:${image.contentType || 'image/png'};base64,${imageBuffer}`,
-              style: 'max-width: 100%; height: auto; border-radius: 8px; margin: 12px auto; display: block; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);',
+              style: 'max-width: 100%; height: auto; border-radius: 8px; margin: 12px auto; display: block;',
             };
           });
         }),
       };
-
       const rawTextResult = await mammoth.extractRawText({ arrayBuffer });
       const htmlResult = await mammoth.convertToHtml({ arrayBuffer }, mammothOptions);
-
-      let html = htmlResult.value;
-
-      // Extract raw media and relationship maps via JSZip for fallback images
-      try {
-        const zip = await JSZip.loadAsync(arrayBuffer);
-        const imageEntries: Record<string, string> = {};
-
-        // Find all images in word/media/
-        const mediaFiles = Object.keys(zip.files).filter((k) => k.startsWith('word/media/'));
-        for (const mediaPath of mediaFiles) {
-          const mediaFile = zip.files[mediaPath];
-          if (mediaFile && !mediaFile.dir) {
-            const ext = mediaPath.split('.').pop()?.toLowerCase() || 'png';
-            const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : 'image/png';
-            const base64Data = await mediaFile.async('base64');
-            const dataUrl = `data:${mimeType};base64,${base64Data}`;
-            const mediaName = mediaPath.replace('word/media/', '');
-            imageEntries[mediaName] = dataUrl;
-          }
-        }
-
-        // Deep Inspection of word/document.xml for paragraph alignments and page breaks
-        const documentXml = await zip.file('word/document.xml')?.async('text');
-        if (documentXml) {
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(documentXml, 'application/xml');
-
-          const paragraphs = Array.from(xmlDoc.getElementsByTagName('w:p'));
-          const alignments: Array<{ textSnippet: string; alignment: string; isPageBreak: boolean }> = [];
-
-          paragraphs.forEach((p) => {
-            const jc = p.getElementsByTagName('w:jc')[0];
-            let alignment = 'left';
-            if (jc) {
-              const val = jc.getAttribute('w:val');
-              if (val === 'center') alignment = 'center';
-              else if (val === 'right') alignment = 'right';
-              else if (val === 'both' || val === 'distribute') alignment = 'justify';
-            }
-
-            // Check for explicit page breaks (<w:br w:type="page"/>)
-            const brs = Array.from(p.getElementsByTagName('w:br'));
-            const hasPageBreak = brs.some((b) => b.getAttribute('w:type') === 'page');
-
-            const textRuns = Array.from(p.getElementsByTagName('w:t'));
-            const pText = textRuns.map((t) => t.textContent || '').join('').trim();
-
-            if (pText.length > 0) {
-              alignments.push({
-                textSnippet: pText.substring(0, 40),
-                alignment,
-                isPageBreak: hasPageBreak,
-              });
-            }
-          });
-
-          // Post-process HTML to inject alignment styles, images, and table formatting
-          const docParser = new DOMParser();
-          const parsedDoc = docParser.parseFromString(html, 'text/html');
-
-          const pElements = Array.from(parsedDoc.body.querySelectorAll('p, h1, h2, h3, h4'));
-
-          pElements.forEach((el) => {
-            const elText = (el.textContent || '').trim().substring(0, 40);
-            const matched = alignments.find(
-              (a) => a.textSnippet && elText && (a.textSnippet.startsWith(elText) || elText.startsWith(a.textSnippet))
-            );
-
-            if (matched && matched.alignment !== 'left') {
-              el.setAttribute(
-                'style',
-                `text-align: ${matched.alignment}; ${el.getAttribute('style') || ''}`
-              );
-            }
-
-            if (matched?.isPageBreak) {
-              const pageBreakDiv = parsedDoc.createElement('div');
-              pageBreakDiv.className = 'page-break';
-              pageBreakDiv.setAttribute('data-page-break', 'true');
-              el.parentNode?.insertBefore(pageBreakDiv, el.nextSibling);
-            }
-          });
-
-          // Style all tables with professional borders and zebra shading
-          parsedDoc.body.querySelectorAll('table').forEach((tbl) => {
-            tbl.setAttribute(
-              'style',
-              'width: 100%; border-collapse: collapse; margin: 16px 0; border: 1px solid #cbd5e1;'
-            );
-            tbl.querySelectorAll('th, td').forEach((cell) => {
-              const existing = cell.getAttribute('style') || '';
-              cell.setAttribute('style', `border: 1px solid #cbd5e1; padding: 8px 12px; ${existing}`);
-            });
-            tbl.querySelectorAll('th').forEach((th) => {
-              const existing = th.getAttribute('style') || '';
-              th.setAttribute('style', `background: #f8fafc; font-weight: bold; ${existing}`);
-            });
-          });
-
-          // Ensure all images are styled with proper margins and aspect ratios
-          parsedDoc.body.querySelectorAll('img').forEach((img) => {
-            if (!img.getAttribute('style')) {
-              img.setAttribute(
-                'style',
-                'max-width: 100%; height: auto; border-radius: 8px; margin: 12px auto; display: block;'
-              );
-            }
-          });
-
-          html = parsedDoc.body.innerHTML;
-        }
-      } catch (xmlErr) {
-        console.warn('Word XML deep inspection non-fatal notice:', xmlErr);
-      }
-
-      if (!html || html.trim() === '') {
-        html = '<p><em>(Empty document)</em></p>';
-      }
-
+      const html = htmlResult.value || '<p><em>(Empty document)</em></p>';
       const pages = splitHtmlIntoPages(html);
-
-      return {
-        html,
-        pages,
-        text: rawTextResult.value,
-        title: fileName,
-      };
-    } catch (err) {
-      console.error('Word parsing error:', err);
-      const text = await file.text();
-      const pages = splitHtmlIntoPages(text);
-      return { html: text, pages, text, title: fileName };
+      return { html, pages, text: rawTextResult.value, title: fileName };
     }
   } else if (isHtml) {
     const text = await file.text();

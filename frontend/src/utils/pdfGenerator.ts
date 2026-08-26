@@ -3,12 +3,15 @@ import html2canvas from 'html2canvas';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
+import { docxDeepParser, DeepParsedSection } from './docxDeepParser';
 
 export interface PDFConversionOptions {
   watermarkText?: string;
   rotationAngle?: number;
   headerTitle?: string;
+  footerText?: string;
   landscape?: boolean;
+  sectionSetup?: DeepParsedSection;
 }
 
 export interface ConvertedPDFResult {
@@ -21,6 +24,19 @@ export interface ConvertedPDFResult {
   pageCount: number;
   fileName: string;
 }
+
+/**
+ * High-Fidelity Vector Multi-Page PDF Exporter for Word Editor
+ */
+export const exportPagesToPDF = (
+  pages: Array<{ content: string; headerText?: string; footerText?: string }>,
+  fileName: string,
+  options: PDFConversionOptions = {}
+): ConvertedPDFResult => {
+  const fullHtml = pages.map((p) => p.content).join('<div class="page-break" data-page-break="true"></div>');
+  const rawText = pages.map((p) => p.content.replace(/<[^>]+>/g, ' ')).join('\n\n');
+  return generateFormattedDocumentPDF(fileName, rawText, fullHtml, options, options.sectionSetup);
+};
 
 /**
  * Exports a DOM element directly as a PDF document.
@@ -283,8 +299,24 @@ export const convertFileToRealPDF = async (
   const baseName = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
 
   // 1. WORD DOCUMENT (.docx, .doc, .rtf, .odt)
-  if (lowerName.endsWith('.docx') || lowerName.endsWith('.doc')) {
+  if (lowerName.endsWith('.docx')) {
     try {
+      const arrayBuffer = await file.arrayBuffer();
+      // Use OOXML Deep Parser for exact section margins, fonts, and media
+      const deepParsed = await docxDeepParser.parse(arrayBuffer, fileName);
+      return generateFormattedDocumentPDF(
+        fileName,
+        deepParsed.plainText,
+        deepParsed.fullHtml,
+        {
+          ...options,
+          landscape: deepParsed.sectionSetup.orientation === 'landscape',
+          headerTitle: deepParsed.sectionSetup.headerText,
+        },
+        deepParsed.sectionSetup
+      );
+    } catch (deepErr) {
+      console.warn('DocxDeepParser fallback in pdfGenerator:', deepErr);
       const arrayBuffer = await file.arrayBuffer();
       const mammothOptions = {
         convertImage: mammoth.images.imgElement((image: any) => {
@@ -295,16 +327,21 @@ export const convertFileToRealPDF = async (
           });
         }),
       };
-
       const rawTextResult = await mammoth.extractRawText({ arrayBuffer });
       const htmlResult = await mammoth.convertToHtml({ arrayBuffer }, mammothOptions);
-
       const textContent = rawTextResult.value.trim() || 'Empty Document';
       const htmlContent = htmlResult.value.trim();
-
+      return generateFormattedDocumentPDF(fileName, textContent, htmlContent, options);
+    }
+  } else if (lowerName.endsWith('.doc') || lowerName.endsWith('.rtf') || lowerName.endsWith('.odt')) {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const rawTextResult = await mammoth.extractRawText({ arrayBuffer });
+      const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
+      const textContent = rawTextResult.value.trim() || 'Empty Document';
+      const htmlContent = htmlResult.value.trim();
       return generateFormattedDocumentPDF(fileName, textContent, htmlContent, options);
     } catch (docxErr) {
-      console.warn('Direct mammoth parsing failed, falling back to text stream:', docxErr);
       const text = await file.text();
       return generateFormattedDocumentPDF(fileName, text, undefined, options);
     }
@@ -421,39 +458,56 @@ function generateFormattedDocumentPDF(
   fileName: string,
   rawText: string,
   htmlContent?: string,
-  options: PDFConversionOptions = {}
+  options: PDFConversionOptions = {},
+  sectionSetup?: DeepParsedSection
 ): ConvertedPDFResult {
-  const doc = new jsPDF('p', 'pt', 'a4');
-  const pageWidth = 595;
-  const pageHeight = 842;
-  const margin = 45;
-  const contentWidth = pageWidth - margin * 2;
+  const isLandscape = options.landscape || sectionSetup?.orientation === 'landscape';
+  const widthPt = sectionSetup?.pageSize?.widthPt || (isLandscape ? 842 : 595.3);
+  const heightPt = sectionSetup?.pageSize?.heightPt || (isLandscape ? 595.3 : 841.9);
+  const marginLeft = sectionSetup?.margins?.leftPt || 45;
+  const marginRight = sectionSetup?.margins?.rightPt || 45;
+  const marginTop = sectionSetup?.margins?.topPt || 50;
+  const marginBottom = sectionSetup?.margins?.bottomPt || 50;
+  const margin = marginLeft;
+
+  const doc = new jsPDF({
+    orientation: isLandscape ? 'l' : 'p',
+    unit: 'pt',
+    format: [widthPt, heightPt],
+  });
+  const pageWidth = widthPt;
+  const pageHeight = heightPt;
+  const contentWidth = pageWidth - marginLeft - marginRight;
   const baseName = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
 
   // Header Banner
-  doc.setFillColor(79, 70, 229); // Brand Indigo
-  doc.rect(0, 0, pageWidth, 55, 'F');
+  doc.setFillColor(43, 87, 154); // Professional Navy Accent
+  doc.rect(0, 0, pageWidth, 48, 'F');
 
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setTextColor(255, 255, 255);
-  doc.text(baseName, margin, 32);
+  doc.text(baseName, marginLeft, 28);
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(224, 231, 255);
-  doc.text(`DocuFlow AI Verified Output • Converted from ${fileName.split('.').pop()?.toUpperCase()}`, margin, 46);
+  doc.text(
+    `${options.headerTitle || 'DocuFlow AI Verified Output'} • ${sectionSetup?.pageSize?.name || 'A4'} Layout`,
+    marginLeft,
+    40
+  );
 
-  let y = 85;
+  let y = marginTop + 20;
   let pageNumber = 1;
 
   const checkPageOverflow = (neededHeight: number = 25) => {
-    if (y + neededHeight > pageHeight - 55) {
+    if (y + neededHeight > pageHeight - marginBottom) {
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184);
-      doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 25, { align: 'center' });
+      doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
 
       doc.addPage();
       pageNumber++;
-      y = 60;
+      y = marginTop;
       return true;
     }
     return false;

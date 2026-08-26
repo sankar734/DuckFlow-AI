@@ -58,8 +58,9 @@ import { AIAssistantPanel } from '../ai/AIAssistantPanel';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
-import { exportElementToPDF } from '../../utils/pdfGenerator';
+import { exportPagesToPDF } from '../../utils/pdfGenerator';
 import { parseWordDocument, splitHtmlIntoPages } from '../../utils/documentParsers';
+import { DeepParsedSection } from '../../utils/docxDeepParser';
 import { uploadToGoogleDrive } from '../../utils/googleDriveSync';
 import { toast } from 'sonner';
 
@@ -213,19 +214,31 @@ export const WordEditor: React.FC<WordEditorProps> = ({
     setIsSaved(false);
   };
 
+  const [importedSectionSetup, setImportedSectionSetup] = useState<DeepParsedSection | undefined>(undefined);
+
   const handleImportFile = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
     try {
       const parsed = await parseWordDocument(file);
       setDocName(file.name);
+      if (parsed.sectionSetup) {
+        setImportedSectionSetup(parsed.sectionSetup);
+        if (parsed.sectionSetup.orientation) {
+          setPageOrientation(parsed.sectionSetup.orientation);
+        }
+      }
+      if (parsed.declaredFonts && parsed.declaredFonts.length > 0) {
+        setFontFamily(parsed.declaredFonts[0]);
+      }
+
       const pageList = parsed.pages && parsed.pages.length > 0 ? parsed.pages : [parsed.html];
       setPages(
         pageList.map((content, idx) => ({
           id: `page_${Date.now()}_${idx + 1}`,
           content,
-          headerText: file.name,
-          footerText: `Page ${idx + 1} of ${pageList.length}`,
+          headerText: parsed.sectionSetup?.headerText || file.name,
+          footerText: parsed.sectionSetup?.footerText || `Page ${idx + 1} of ${pageList.length}`,
         }))
       );
       setIsSaved(true);
@@ -277,9 +290,19 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   };
 
   const handleExportPDF = () => {
-    if (!printContainerRef.current) return;
-    exportElementToPDF(printContainerRef.current, docName);
-    toast.success('Exporting multi-page document as PDF...');
+    try {
+      exportPagesToPDF(pages, docName, {
+        sectionSetup: importedSectionSetup,
+        landscape: pageOrientation === 'landscape',
+        headerTitle: docName,
+      });
+      toast.success('Vector multi-page PDF generated and downloaded!');
+    } catch (err) {
+      console.warn('Vector PDF export notice, falling back:', err);
+      if (printContainerRef.current) {
+        exportPagesToPDF(pages, docName);
+      }
+    }
   };
 
   const handleInsertCustomTable = () => {
@@ -935,6 +958,12 @@ export const WordEditor: React.FC<WordEditorProps> = ({
               className="w-full flex justify-center"
             >
               <div
+                style={{
+                  paddingTop: importedSectionSetup?.margins ? `${importedSectionSetup.margins.topPt}pt` : undefined,
+                  paddingBottom: importedSectionSetup?.margins ? `${importedSectionSetup.margins.bottomPt}pt` : undefined,
+                  paddingLeft: importedSectionSetup?.margins ? `${importedSectionSetup.margins.leftPt}pt` : undefined,
+                  paddingRight: importedSectionSetup?.margins ? `${importedSectionSetup.margins.rightPt}pt` : undefined,
+                }}
                 className={`relative w-full shadow-2xl rounded-sm border transition-all ${
                   pageOrientation === 'landscape'
                     ? 'max-w-[1100px] min-h-[500px] sm:min-h-[750px] p-4 sm:p-10 lg:p-14'
