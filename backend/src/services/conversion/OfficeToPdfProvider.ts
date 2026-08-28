@@ -71,7 +71,7 @@ export class OfficeToPdfProvider implements IConversionProvider {
     const inPath = await new Promise<string | null>((resolve) => {
       const cmd = isWin ? 'where' : 'which';
       const args = [isWin ? 'soffice.exe' : 'libreoffice'];
-      const proc = spawn(cmd, args);
+      const proc = spawn(cmd, args, { timeout: 3000 });
       let output = '';
       proc.stdout?.on('data', (d) => (output += d.toString()));
       proc.on('close', (code) => {

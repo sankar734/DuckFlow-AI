@@ -6,7 +6,9 @@ import { ConversionJob, ConversionStatus } from '../models/ConversionJob';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import { officeToPdfProvider } from './conversion/OfficeToPdfProvider';
+import { pdfToOfficeProvider } from './conversion/PdfToOfficeProvider';
 import { imageToPdfProvider } from './conversion/ImageToPdfProvider';
+import { pdfToImageProvider } from './conversion/PdfToImageProvider';
 import { pdfUtilityProvider } from './conversion/PdfUtilityProvider';
 import { ConversionOptions, ProviderConversionResult } from './conversion/types';
 
@@ -130,10 +132,30 @@ export class ConversionService {
           tgtFmt,
           data.options
         );
+      } else if (pdfToOfficeProvider.canHandle(srcFmt, tgtFmt)) {
+        job.progress = 60;
+        await job.save();
+        providerResult = await pdfToOfficeProvider.convert(
+          inputBuffer,
+          data.sourceFileName,
+          srcFmt,
+          tgtFmt,
+          data.options
+        );
       } else if (imageToPdfProvider.canHandle(srcFmt, tgtFmt)) {
         job.progress = 60;
         await job.save();
         providerResult = await imageToPdfProvider.convert(
+          inputBuffer,
+          data.sourceFileName,
+          srcFmt,
+          tgtFmt,
+          data.options
+        );
+      } else if (pdfToImageProvider.canHandle(srcFmt, tgtFmt)) {
+        job.progress = 60;
+        await job.save();
+        providerResult = await pdfToImageProvider.convert(
           inputBuffer,
           data.sourceFileName,
           srcFmt,
