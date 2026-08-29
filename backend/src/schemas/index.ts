@@ -91,7 +91,10 @@ export const conversionJobSchema = z.object({
   sourceFormat: z.string(),
   targetFormat: z.string(),
   sourceFileName: z.string(),
+  fileSize: z.number().optional(),
   documentId: z.string().optional(),
+  fileData: z.string().optional(),
+  options: z.any().optional(),
 });
 
 export const createOrderSchema = z.object({
