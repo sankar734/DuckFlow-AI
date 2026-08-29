@@ -18,7 +18,17 @@ import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { DocumentPreviewModal } from '../../components/documents/DocumentPreviewModal';
 import { convertFileToRealPDF, ConvertedPDFResult } from '../../utils/pdfGenerator';
+import { api } from '../../services/api';
 import { toast } from 'sonner';
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
 
 interface ConversionQueueItem {
   id: string;
@@ -81,9 +91,56 @@ export const ConverterPage: React.FC = () => {
     toast.success(`${files.length} file(s) added to queue! Ready to convert.`);
   };
 
+  const executeConversionForFile = async (item: ConversionQueueItem): Promise<{
+    url: string;
+    blob?: Blob;
+    extractedText?: string;
+    htmlContent?: string;
+    tableData?: { headers: string[]; rows: string[][] };
+    slides?: Array<{ title: string; subtitle?: string; content: string[] }>;
+  }> => {
+    if (!item.file) throw new Error('File not found');
+
+    // Attempt Backend API Conversion first
+    try {
+      const base64Data = await fileToBase64(item.file);
+      const res: any = await api.post('/conversions', {
+        sourceFileName: item.fileName,
+        sourceFormat: item.sourceFormat,
+        targetFormat: item.targetFormat,
+        fileSize: item.file.size,
+        fileData: base64Data,
+        options: {
+          engine: engineType,
+          preserveFormatting: true,
+        },
+      });
+
+      if (res && res.data && res.data.downloadUrl) {
+        return {
+          url: res.data.downloadUrl,
+          extractedText: `Document converted via ${res.data.converterEngine || 'High-Fidelity Engine'}`,
+        };
+      }
+    } catch (apiErr) {
+      console.warn('Backend conversion API notice, utilizing direct vector engine:', apiErr);
+    }
+
+    // Client-side high-fidelity vector engine fallback
+    const result: ConvertedPDFResult = await convertFileToRealPDF(item.file, item.targetFormat);
+    return {
+      url: result.url,
+      blob: result.blob,
+      extractedText: result.extractedText,
+      htmlContent: result.htmlContent,
+      tableData: result.tableData,
+      slides: result.slides,
+    };
+  };
+
   const handleConvertItem = async (id: string) => {
     const item = queue.find((q) => q.id === id);
-    if (!item) return;
+    if (!item || !item.file) return;
 
     setQueue((prev) =>
       prev.map((it) =>
@@ -94,49 +151,44 @@ export const ConverterPage: React.FC = () => {
     );
 
     try {
-      if (item.file) {
-        // Stage 1: Reading & Parsing
-        setQueue((prev) =>
-          prev.map((it) =>
-            it.id === id
-              ? { ...it, progress: 55, stageMessage: 'Rendering pages & typography...' }
-              : it
-          )
-        );
+      setQueue((prev) =>
+        prev.map((it) =>
+          it.id === id
+            ? { ...it, progress: 60, stageMessage: 'Rendering pages, fonts & geometry...' }
+            : it
+        )
+      );
 
-        const result: ConvertedPDFResult = await convertFileToRealPDF(item.file, item.targetFormat);
+      const result = await executeConversionForFile(item);
 
-        // Stage 2: Validation
-        setQueue((prev) =>
-          prev.map((it) =>
-            it.id === id
-              ? { ...it, progress: 85, stageMessage: 'Validating output fidelity...' }
-              : it
-          )
-        );
+      setQueue((prev) =>
+        prev.map((it) =>
+          it.id === id
+            ? { ...it, progress: 90, stageMessage: 'Validating output fidelity...' }
+            : it
+        )
+      );
 
-        // Stage 3: Completed
-        setQueue((prev) =>
-          prev.map((it) => {
-            if (it.id === id) {
-              return {
-                ...it,
-                status: 'COMPLETED',
-                progress: 100,
-                stageMessage: 'Conversion completed successfully',
-                downloadUrl: result.url,
-                pdfBlob: result.blob,
-                extractedText: result.extractedText,
-                htmlContent: result.htmlContent,
-                tableData: result.tableData,
-                slides: result.slides,
-              };
-            }
-            return it;
-          })
-        );
-        toast.success(`Converted "${item.fileName}" into authentic PDF with real content!`);
-      }
+      setQueue((prev) =>
+        prev.map((it) => {
+          if (it.id === id) {
+            return {
+              ...it,
+              status: 'COMPLETED',
+              progress: 100,
+              stageMessage: 'Conversion completed successfully',
+              downloadUrl: result.url,
+              pdfBlob: result.blob,
+              extractedText: result.extractedText,
+              htmlContent: result.htmlContent,
+              tableData: result.tableData,
+              slides: result.slides,
+            };
+          }
+          return it;
+        })
+      );
+      toast.success(`Converted "${item.fileName}" into authentic PDF with real content!`);
     } catch (err: any) {
       console.error('Conversion error:', err);
       toast.error(`Error converting ${item.fileName}`);
@@ -163,7 +215,7 @@ export const ConverterPage: React.FC = () => {
     for (const item of pendingItems) {
       if (item.file) {
         try {
-          const result = await convertFileToRealPDF(item.file, item.targetFormat);
+          const result = await executeConversionForFile(item);
           setQueue((prev) =>
             prev.map((it) => {
               if (it.id === item.id) {
