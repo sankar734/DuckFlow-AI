@@ -6,7 +6,7 @@ import morgan from 'morgan';
 import path from 'path';
 import fs from 'fs';
 import mongoose from 'mongoose';
-import { env } from './config/env';
+import { env, validateProductionEnvironment } from './config/env';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { initSocketServer } from './config/socket';
 import { logger } from './utils/logger';
@@ -27,27 +27,74 @@ app.use(helmet({
   crossOriginResourcePolicy: false,
 }));
 
-// Allowed CORS origins
-const allowedOrigins = [
-  ...env.FRONTEND_URL.split(',').map((url) => url.trim()),
+// Build normalized Allowed CORS Origins list
+const configuredOrigins = [
+  ...env.FRONTEND_URL.split(','),
+  ...env.CORS_ORIGINS.split(','),
+]
+  .map((url) => url.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const defaultDevOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
 ];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, server-to-server)
-    if (!origin || allowedOrigins.includes(origin) || env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-    return callback(null, true); // Allow configured origins in cloud hosting
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-}));
+const allowedOriginsSet = new Set([...configuredOrigins, ...defaultDevOrigins]);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // 1. Allow non-browser requests (mobile apps, Postman, server-to-server, curl)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const cleanOrigin = origin.trim().replace(/\/+$/, '');
+
+      // 2. Direct exact match
+      if (allowedOriginsSet.has(cleanOrigin)) {
+        return callback(null, true);
+      }
+
+      // 3. Allow Netlify & Vercel deploy previews or subdomains
+      const isDeployPreview =
+        /^https:\/\/[a-zA-Z0-9_-]+\.netlify\.app$/.test(cleanOrigin) ||
+        /^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(cleanOrigin) ||
+        /^https:\/\/[a-zA-Z0-9_-]+\.onrender\.com$/.test(cleanOrigin);
+
+      if (isDeployPreview) {
+        return callback(null, true);
+      }
+
+      // In non-production, be lenient for local testing
+      if (env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+
+      logger.warn(`[CORS] Request from disallowed origin: ${origin}`);
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'X-Request-Id',
+      'Accept',
+      'Origin',
+    ],
+    exposedHeaders: ['X-Request-Id'],
+  })
+);
+
+// Handle preflight OPTIONS requests across all routes
+app.options('*', cors());
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -100,6 +147,7 @@ app.use(errorHandler);
 const PORT = parseInt(env.PORT, 10) || 5000;
 
 connectDatabase().then(() => {
+  validateProductionEnvironment();
   server.listen(PORT, '0.0.0.0', () => {
     logger.info(`🚀 DocuFlow AI Backend running on port ${PORT} in ${env.NODE_ENV} mode`);
     logger.info(`📡 API Endpoint: http://localhost:${PORT}/api/v1`);

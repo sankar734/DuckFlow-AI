@@ -320,11 +320,99 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(to: string, resetLink: string): Promise<void> {
-    logger.info(`[EMAIL] Sending Password Reset Link to ${to}`);
+    logger.info(`[EMAIL] Dispatching Password Reset Link to ${to}`);
+    if (!this.transporter) {
+      this.initTransporter();
+    }
+
+    const html = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 40px 20px; max-width: 560px; margin: 0 auto; border-radius: 16px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="display: inline-block; padding: 10px 18px; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); border-radius: 12px; margin-bottom: 12px;">
+            <span style="font-size: 20px; font-weight: bold; color: #ffffff;">DocuFlow AI</span>
+          </div>
+          <h1 style="color: #ffffff; font-size: 22px; margin: 6px 0 2px; font-weight: 700;">Reset Your Password</h1>
+        </div>
+        
+        <div style="background-color: #131b2e; padding: 28px; border-radius: 14px; border: 1px solid #23314f; text-align: center;">
+          <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin-top: 0;">
+            We received a request to reset your DocuFlow AI account password. Click the button below to choose a new password:
+          </p>
+
+          <div style="margin: 28px 0;">
+            <a href="${resetLink}" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; font-weight: 600; font-size: 15px; border-radius: 10px; box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4);">
+              Reset Password &rarr;
+            </a>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
+            This link is valid for 1 hour. If you did not request a password reset, you can safely ignore this email.
+          </p>
+        </div>
+
+        <div style="text-align: center; margin-top: 24px; color: #64748b; font-size: 11px;">
+          &copy; ${new Date().getFullYear()} DocuFlow AI Security Team.
+        </div>
+      </div>
+    `;
+
+    try {
+      if (this.transporter) {
+        await this.transporter.sendMail({
+          from: `"DocuFlow AI Security" <${env.SMTP_USER || 'noreply@docuflow.ai'}>`,
+          to,
+          subject: '🔒 Reset Your DocuFlow AI Password',
+          html,
+          text: `Reset your DocuFlow AI password using this link: ${resetLink}`,
+        });
+      }
+    } catch (err: any) {
+      logger.warn(`[EMAIL] Password reset note: ${err?.message || err}`);
+    }
   }
 
   async sendShareInvite(to: string, documentName: string, role: string, shareUrl: string): Promise<void> {
-    logger.info(`[EMAIL] Sending Share Invite to ${to}`);
+    logger.info(`[EMAIL] Dispatching Share Invite for ${documentName} to ${to}`);
+    if (!this.transporter) {
+      this.initTransporter();
+    }
+
+    const html = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 40px 20px; max-width: 560px; margin: 0 auto; border-radius: 16px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="display: inline-block; padding: 10px 18px; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); border-radius: 12px; margin-bottom: 12px;">
+            <span style="font-size: 20px; font-weight: bold; color: #ffffff;">DocuFlow AI</span>
+          </div>
+          <h1 style="color: #ffffff; font-size: 22px; margin: 6px 0 2px; font-weight: 700;">Document Shared With You</h1>
+        </div>
+        
+        <div style="background-color: #131b2e; padding: 28px; border-radius: 14px; border: 1px solid #23314f; text-align: center;">
+          <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin-top: 0;">
+            You have been invited to collaborate on <strong>${documentName}</strong> with <strong>${role}</strong> permissions.
+          </p>
+
+          <div style="margin: 28px 0;">
+            <a href="${shareUrl}" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; font-weight: 600; font-size: 15px; border-radius: 10px; box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4);">
+              Open Document &rarr;
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    try {
+      if (this.transporter) {
+        await this.transporter.sendMail({
+          from: `"DocuFlow AI Collaboration" <${env.SMTP_USER || 'noreply@docuflow.ai'}>`,
+          to,
+          subject: `📄 Document Shared with You: ${documentName}`,
+          html,
+          text: `You have been invited to collaborate on ${documentName}: ${shareUrl}`,
+        });
+      }
+    } catch (err: any) {
+      logger.warn(`[EMAIL] Share invite note: ${err?.message || err}`);
+    }
   }
 }
 

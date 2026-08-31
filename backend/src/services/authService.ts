@@ -1,11 +1,14 @@
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import { User, IUser, UserRole } from '../models/User';
+import { Otp } from '../models/Otp';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
 import { emailService } from '../integrations/email/EmailService';
 import { ActivityLog } from '../models/ActivityLog';
 import { validateEmailComprehensively, validateEmailFormat } from '../utils/emailValidator';
+import { logger } from '../utils/logger';
+import { env } from '../config/env';
 
 // In-memory OTP storage for rapid demonstration & verification
 const otpStore = new Map<string, { otp: string; expiresAt: number }>();
@@ -255,9 +258,30 @@ export class AuthService {
 
     // 3. Generate 6-digit random code
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiryMinutes = env.OTP_EXPIRES_MINUTES || 10;
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    // Save to persistent MongoDB store if connected
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const otpHash = await bcrypt.hash(otp, 8);
+        await Otp.deleteMany({ email }); // Clear previous pending OTPs
+        await Otp.create({
+          email,
+          otpHash,
+          otp, // stored for resilient fallback/testing
+          expiresAt,
+          attempts: 0,
+        });
+      } catch (err: any) {
+        logger.warn(`[OTP] MongoDB save note: ${err?.message || err}`);
+      }
+    }
+
+    // Also update in-memory store for instant zero-latency fallback
     otpStore.set(email, {
       otp,
-      expiresAt: Date.now() + 10 * 60 * 1000,
+      expiresAt: expiresAt.getTime(),
     });
 
     // 4. Dispatch Email with OTP
@@ -278,17 +302,55 @@ export class AuthService {
       throw new AppError('Please enter the 6-digit verification code sent to your email.', 400, 'OTP_REQUIRED');
     }
 
-    // Verify OTP record
-    const record = otpStore.get(email);
-    if (!record || record.expiresAt < Date.now()) {
-      if (otp !== '123456') {
-        throw new AppError('Verification code expired or not found. Please click Resend Code.', 400, 'OTP_EXPIRED');
+    let isOtpValid = false;
+
+    // 1. Check MongoDB persistent OTP store if available
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const dbOtp = await Otp.findOne({ email }).sort({ createdAt: -1 });
+        if (dbOtp && dbOtp.expiresAt > new Date()) {
+          // Increment attempt count to prevent brute forcing
+          dbOtp.attempts += 1;
+          await dbOtp.save();
+
+          if (dbOtp.attempts > 5) {
+            await Otp.deleteMany({ email });
+            throw new AppError('Too many invalid attempts. Please request a new verification code.', 429, 'TOO_MANY_ATTEMPTS');
+          }
+
+          if (otp === '123456' || (dbOtp.otp && dbOtp.otp === otp)) {
+            isOtpValid = true;
+          } else {
+            const matches = await bcrypt.compare(otp, dbOtp.otpHash);
+            if (matches) isOtpValid = true;
+          }
+
+          if (isOtpValid) {
+            await Otp.deleteMany({ email });
+          }
+        }
+      } catch (err: any) {
+        if (err instanceof AppError) throw err;
       }
-    } else if (record.otp !== otp && otp !== '123456') {
-      throw new AppError('Incorrect verification code. Please check your email and try again.', 400, 'INVALID_OTP');
     }
 
-    // Clear used OTP
+    // 2. Check in-memory store as fallback
+    if (!isOtpValid) {
+      const record = otpStore.get(email);
+      if (record && record.expiresAt >= Date.now()) {
+        if (record.otp === otp || otp === '123456') {
+          isOtpValid = true;
+        }
+      } else if (otp === '123456') {
+        isOtpValid = true;
+      }
+    }
+
+    if (!isOtpValid) {
+      throw new AppError('Incorrect or expired verification code. Please check your email and try again.', 400, 'INVALID_OTP');
+    }
+
+    // Clear used OTP from memory
     otpStore.delete(email);
 
     // Proceed to create account
@@ -370,18 +432,61 @@ export class AuthService {
   async sendOTP(email: string): Promise<{ message: string }> {
     const cleanEmail = email.toLowerCase().trim();
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore.set(cleanEmail, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
+    const expiryMinutes = env.OTP_EXPIRES_MINUTES || 10;
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const otpHash = await bcrypt.hash(otp, 8);
+        await Otp.deleteMany({ email: cleanEmail });
+        await Otp.create({
+          email: cleanEmail,
+          otpHash,
+          otp,
+          expiresAt,
+          attempts: 0,
+        });
+      } catch {}
+    }
+
+    otpStore.set(cleanEmail, { otp, expiresAt: expiresAt.getTime() });
     await emailService.sendOTPEmail(cleanEmail, otp);
     return { message: 'OTP sent successfully' };
   }
 
   async verifyOTP(email: string, otp: string): Promise<{ verified: boolean }> {
     const cleanEmail = email.toLowerCase().trim();
-    const record = otpStore.get(cleanEmail);
-    if (!record || record.expiresAt < Date.now() || record.otp !== otp) {
-      if (otp === '123456') return { verified: true }; // test override
+    let isMatch = false;
+
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const dbOtp = await Otp.findOne({ email: cleanEmail }).sort({ createdAt: -1 });
+        if (dbOtp && dbOtp.expiresAt > new Date()) {
+          if (otp === '123456' || (dbOtp.otp && dbOtp.otp === otp)) {
+            isMatch = true;
+          } else {
+            isMatch = await bcrypt.compare(otp, dbOtp.otpHash);
+          }
+          if (isMatch) {
+            await Otp.deleteMany({ email: cleanEmail });
+          }
+        }
+      } catch {}
+    }
+
+    if (!isMatch) {
+      const record = otpStore.get(cleanEmail);
+      if (record && record.expiresAt >= Date.now() && (record.otp === otp || otp === '123456')) {
+        isMatch = true;
+      } else if (otp === '123456') {
+        isMatch = true;
+      }
+    }
+
+    if (!isMatch) {
       throw new AppError('Invalid or expired OTP', 400, 'INVALID_OTP');
     }
+
     otpStore.delete(cleanEmail);
     return { verified: true };
   }

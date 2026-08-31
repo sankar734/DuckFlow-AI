@@ -4,7 +4,9 @@ dotenv.config();
 export const env = {
   PORT: process.env.PORT || '5000',
   NODE_ENV: process.env.NODE_ENV || 'development',
-  MONGODB_URI: process.env.MONGODB_URI || 'mongodb+srv://auspicious_7:auspicious@cluster0.lmug82r.mongodb.net/docuflow?retryWrites=true&w=majority',
+  MONGODB_URI:
+    process.env.MONGODB_URI ||
+    'mongodb+srv://auspicious_7:auspicious@cluster0.lmug82r.mongodb.net/docuflow?retryWrites=true&w=majority',
 
   JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || 'docuflow_jwt_access_super_secret_key_2026_secure',
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'docuflow_jwt_refresh_super_secret_key_2026_secure',
@@ -14,7 +16,8 @@ export const env = {
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
 
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '1084239857421-mockgoogleoauth2docuflowai.apps.googleusercontent.com',
+  GOOGLE_CLIENT_ID:
+    process.env.GOOGLE_CLIENT_ID || '1084239857421-mockgoogleoauth2docuflowai.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
 
   CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
@@ -35,9 +38,31 @@ export const env = {
   SMTP_HOST: process.env.SMTP_HOST || 'smtp.mailtrap.io',
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '2525', 10),
   SMTP_USER: process.env.SMTP_USER || '',
-  SMTP_PASSWORD: process.env.SMTP_PASSWORD || '',
+  SMTP_PASSWORD: process.env.SMTP_PASSWORD || process.env.SMTP_PASS || '',
   EMAIL_FROM: process.env.EMAIL_FROM || 'noreply@docuflow.ai',
 
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
+  CORS_ORIGINS: process.env.CORS_ORIGINS || '',
+  OTP_EXPIRES_MINUTES: parseInt(process.env.OTP_EXPIRES_MINUTES || '10', 10),
   MOBILE_DEEP_LINK: process.env.MOBILE_DEEP_LINK || 'docuflow://',
+};
+
+// Validate production environment settings on startup
+export const validateProductionEnvironment = () => {
+  if (env.NODE_ENV === 'production') {
+    const requiredVars = [
+      { name: 'MONGODB_URI', value: env.MONGODB_URI },
+      { name: 'JWT_ACCESS_SECRET', value: env.JWT_ACCESS_SECRET },
+      { name: 'FRONTEND_URL', value: env.FRONTEND_URL },
+    ];
+
+    const missing = requiredVars.filter((v) => !v.value || v.value.includes('localhost'));
+    if (missing.length > 0) {
+      console.warn(
+        `⚠️ [PROD WARNING] The following environment settings should be verified for cloud hosting: ${missing
+          .map((m) => m.name)
+          .join(', ')}`
+      );
+    }
+  }
 };
