@@ -190,7 +190,7 @@ export const BillingPage: React.FC = () => {
                   <span className="text-xs font-normal text-slate-400">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                 </div>
                 <div className="text-xs text-brand-600 dark:text-brand-400 font-semibold mb-4">
-                  {p.credits} AI Credits • {p.storage} Storage
+                  {p.credits} AI Credits • Full Office & PDF Suite
                 </div>
 
                 <ul className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300">

@@ -106,45 +106,23 @@ export const DashboardHomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Storage and AI Usage Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Storage Card */}
-        <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400">
-              <HardDrive className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">Local & Device Storage</div>
-              <div className="text-xs text-slate-400">Offline & Local Document Cache (Active)</div>
-              <div className="w-48 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mt-2 overflow-hidden">
-                <div className="w-[100%] h-full bg-emerald-500 rounded-full" />
-              </div>
+      {/* AI Usage & Plan Overview Card */}
+      <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+            <Zap className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-slate-900 dark:text-white">AI Credits & Smart Copilot Status</div>
+            <div className="text-xs text-slate-400">Active Plan: 435 credits available (Full Word, Excel, PPT, PDF AI Tools unlocked)</div>
+            <div className="w-64 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mt-2 overflow-hidden">
+              <div className="w-[87%] h-full bg-gradient-to-r from-brand-500 to-purple-500 rounded-full" />
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate('/documents')}>
-            Browse Files
-          </Button>
         </div>
-
-        {/* AI Credits Card */}
-        <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-              <Zap className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">AI Credits Meter</div>
-              <div className="text-xs text-slate-400">435 credits available (65 consumed)</div>
-              <div className="w-48 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mt-2 overflow-hidden">
-                <div className="w-[13%] h-full bg-purple-500 rounded-full" />
-              </div>
-            </div>
-          </div>
-          <Button variant="gradient" size="sm" onClick={() => navigate('/billing')}>
-            Upgrade Plan
-          </Button>
-        </div>
+        <Button variant="gradient" size="sm" onClick={() => navigate('/billing')}>
+          Manage Plan
+        </Button>
       </div>
 
       {/* Recent Documents Section */}

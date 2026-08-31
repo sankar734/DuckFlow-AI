@@ -198,7 +198,7 @@ export const AIStudioPage: React.FC = () => {
         className="hidden"
       />
 
-      {/* Cloud Sync & Storage Top Banner */}
+      {/* Sync & Export Top Banner */}
       <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/60 via-indigo-950/60 to-purple-950/60 border border-blue-500/30 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/40 text-blue-300 flex items-center justify-center shrink-0">
@@ -206,13 +206,13 @@ export const AIStudioPage: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-white">Gmail Cloud & Google Drive Storage</span>
+              <span className="text-xs font-bold text-white">Google Drive & Gmail Document Sync</span>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> {cloudState.isConnected && cloudState.email ? `Connected (${cloudState.email})` : 'Cloud Sync Ready'}
+                <CheckCircle2 className="w-3 h-3" /> {cloudState.isConnected && cloudState.email ? `Connected (${cloudState.email})` : 'Sync Ready'}
               </span>
             </div>
             <p className="text-[11px] text-slate-300 mt-0.5">
-              Zero storage limits. Save files directly to your device storage or sync to your personal Google Drive.
+              Access your local files on your device or export directly to your personal Google Drive.
             </p>
           </div>
         </div>

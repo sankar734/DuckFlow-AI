@@ -153,25 +153,8 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Storage & AI Credit Mini-Widgets */}
+      {/* AI Credit Mini-Widget */}
       <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800/80 space-y-3">
-        {/* Storage Meter */}
-        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200/60 dark:border-slate-800/60">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-            <span className="flex items-center gap-1">
-              <HardDrive className="w-3.5 h-3.5 text-brand-500" /> Storage
-            </span>
-            <span className="text-slate-400 font-mono text-[10px]">
-              {storageUsedGB}GB / {storageLimitGB}GB
-            </span>
-          </div>
-          <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-brand-500 to-indigo-500 transition-all duration-500"
-              style={{ width: `${storagePercent}%` }}
-            />
-          </div>
-        </div>
 
         {/* AI Credits Meter */}
         <Link
