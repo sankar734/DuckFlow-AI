@@ -4,41 +4,126 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '.
 import { AppError } from '../middleware/errorHandler';
 import { emailService } from '../integrations/email/EmailService';
 import { ActivityLog } from '../models/ActivityLog';
+import { validateEmailComprehensively, validateEmailFormat } from '../utils/emailValidator';
 
 // In-memory OTP storage for rapid demonstration & verification
 const otpStore = new Map<string, { otp: string; expiresAt: number }>();
 
 export class AuthService {
+  /**
+   * Real-time Email Validity, Fake Check & Availability Inspector
+   */
+  async checkEmail(email: string, mode: 'register' | 'login' = 'register'): Promise<{
+    valid: boolean;
+    isDisposable: boolean;
+    hasValidMx: boolean;
+    inUse: boolean;
+    message: string;
+  }> {
+    const cleanEmail = (email || '').toLowerCase().trim();
+
+    const validation = await validateEmailComprehensively(cleanEmail);
+    if (!validation.isValidFormat || validation.isDisposable || !validation.hasValidMx) {
+      return {
+        valid: false,
+        isDisposable: validation.isDisposable,
+        hasValidMx: validation.hasValidMx,
+        inUse: false,
+        message: validation.error || 'Invalid email address.',
+      };
+    }
+
+    let inUse = false;
+    try {
+      const user = await User.findOne({ email: cleanEmail });
+      inUse = Boolean(user);
+    } catch {
+      inUse = false;
+    }
+
+    if (mode === 'register' && inUse) {
+      return {
+        valid: false,
+        isDisposable: false,
+        hasValidMx: true,
+        inUse: true,
+        message: 'This email is already registered. Please sign in.',
+      };
+    }
+
+    if (mode === 'login' && !inUse) {
+      return {
+        valid: true,
+        isDisposable: false,
+        hasValidMx: true,
+        inUse: false,
+        message: 'No account found with this email. You can register for free.',
+      };
+    }
+
+    return {
+      valid: true,
+      isDisposable: false,
+      hasValidMx: true,
+      inUse,
+      message: mode === 'register' ? 'Email address is valid and verified!' : 'Account verified and ready to login.',
+    };
+  }
+
   async register(data: { name: string; email: string; password?: string; phone?: string }): Promise<{ user: any; accessToken: string; refreshToken: string }> {
-    const email = data.email.toLowerCase();
-    const name = data.name || email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const email = data.email.toLowerCase().trim();
+    const name = (data.name || email.split('@')[0]).trim();
+
+    // 1. Strict Email Validity & Fake Email Inspection
+    const emailValidation = await validateEmailComprehensively(email);
+    if (!emailValidation.isValidFormat || emailValidation.isDisposable || !emailValidation.hasValidMx) {
+      throw new AppError(emailValidation.error || 'Please provide a valid and active email address.', 400, 'INVALID_EMAIL');
+    }
 
     try {
-      let user = await User.findOne({ email });
-      if (user) {
-        // Return existing user session seamlessly
-        user.lastLoginAt = new Date();
-        await user.save();
-      } else {
-        user = await User.create({
-          name,
-          email,
-          phone: data.phone,
-          role: UserRole.USER,
-          planId: 'free',
-          storageLimit: 50 * 1024 * 1024 * 1024,
-          aiCredits: 100,
-          aiCreditsUsed: 0,
-          emailVerified: true,
-          lastLoginAt: new Date(),
-        });
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        throw new AppError('An account with this email already exists. Please sign in.', 400, 'USER_EXISTS');
       }
+
+      let passwordHash: string | undefined = undefined;
+      if (data.password && data.password.trim()) {
+        passwordHash = await bcrypt.hash(data.password.trim(), 10);
+      }
+
+      const user = await User.create({
+        name,
+        email,
+        phone: data.phone,
+        passwordHash,
+        role: UserRole.USER,
+        planId: 'free',
+        storageLimit: 50 * 1024 * 1024 * 1024,
+        aiCredits: 100,
+        aiCreditsUsed: 0,
+        emailVerified: true,
+        lastLoginAt: new Date(),
+      });
+
+      // Dispatch real welcome email notification asynchronously
+      emailService.sendWelcomeRegistrationEmail(user.email, user.name).catch(() => {});
+
+      try {
+        await ActivityLog.create({
+          userId: user._id,
+          action: 'USER_REGISTER',
+          resourceType: 'User',
+          resourceId: user._id.toString(),
+        });
+      } catch {}
 
       const accessToken = generateAccessToken({ userId: user._id.toString(), email: user.email, role: user.role });
       const refreshToken = generateRefreshToken({ userId: user._id.toString(), email: user.email, role: user.role });
 
       return { user, accessToken, refreshToken };
-    } catch (dbErr) {
+    } catch (err: any) {
+      if (err instanceof AppError) throw err;
+
       // Resilient fallback if MongoDB is in buffering/offline state
       const fallbackId = `usr_${Date.now()}`;
       const fallbackUser = {
@@ -53,6 +138,10 @@ export class AuthService {
         emailVerified: true,
         lastLoginAt: new Date(),
       };
+      
+      // Dispatch email notification
+      emailService.sendWelcomeRegistrationEmail(email, name).catch(() => {});
+
       const accessToken = generateAccessToken({ userId: fallbackId, email, role: 'USER' });
       const refreshToken = generateRefreshToken({ userId: fallbackId, email, role: 'USER' });
 
@@ -61,37 +150,61 @@ export class AuthService {
   }
 
   async login(data: { name?: string; email: string; password?: string }): Promise<{ user: any; accessToken: string; refreshToken: string }> {
-    const email = data.email.toLowerCase();
-    const derivedName = data.name || email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const email = data.email.toLowerCase().trim();
+    const password = data.password ? data.password.trim() : '';
+
+    if (!validateEmailFormat(email)) {
+      throw new AppError('Please enter a valid email format (e.g. name@domain.com).', 400, 'INVALID_EMAIL_FORMAT');
+    }
 
     try {
-      let user = await User.findOne({ email });
+      const user = await User.findOne({ email });
       if (!user) {
-        user = await User.create({
-          name: derivedName,
-          email,
-          role: UserRole.USER,
-          planId: 'free',
-          storageLimit: 50 * 1024 * 1024 * 1024,
-          aiCredits: 100,
-          aiCreditsUsed: 0,
-          emailVerified: true,
-          lastLoginAt: new Date(),
-        });
-      } else {
-        if (data.name && data.name !== user.name) {
-          user.name = data.name;
-        }
-        user.lastLoginAt = new Date();
-        await user.save();
+        throw new AppError('No account found with this email address. Please register first.', 404, 'USER_NOT_FOUND');
       }
+
+      if (user.isBlocked || !user.isActive) {
+        throw new AppError('Your account has been deactivated. Please contact support.', 403, 'ACCOUNT_BLOCKED');
+      }
+
+      // If user has a password set, verify it
+      if (user.passwordHash) {
+        if (!password) {
+          throw new AppError('Please enter your password.', 400, 'PASSWORD_REQUIRED');
+        }
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!isMatch) {
+          throw new AppError('Incorrect password. Please verify and try again.', 401, 'INVALID_PASSWORD');
+        }
+      } else if (password) {
+        // First-time setting password for legacy / OAuth-created account
+        user.passwordHash = await bcrypt.hash(password, 10);
+      }
+
+      user.lastLoginAt = new Date();
+      await user.save();
+
+      // Trigger login security alert email asynchronously
+      emailService.sendLoginSecurityAlert(user.email, user.name).catch(() => {});
+
+      try {
+        await ActivityLog.create({
+          userId: user._id,
+          action: 'USER_LOGIN',
+          resourceType: 'User',
+          resourceId: user._id.toString(),
+        });
+      } catch {}
 
       const accessToken = generateAccessToken({ userId: user._id.toString(), email: user.email, role: user.role });
       const refreshToken = generateRefreshToken({ userId: user._id.toString(), email: user.email, role: user.role });
 
       return { user, accessToken, refreshToken };
-    } catch (dbErr) {
+    } catch (err: any) {
+      if (err instanceof AppError) throw err;
+
       // In-memory fallback if MongoDB connection is pending or network access is restricted
+      const derivedName = data.name || email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
       const fallbackId = `usr_${Date.now()}`;
       const fallbackUser = {
         _id: fallbackId,

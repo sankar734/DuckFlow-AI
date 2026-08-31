@@ -25,6 +25,16 @@ export class AuthController {
     }
   }
 
+  async checkEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, mode } = req.body;
+      const result = await authService.checkEmail(email, mode);
+      sendSuccess(res, result, 'Email status checked');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async googleLogin(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await authService.googleLogin(req.body);

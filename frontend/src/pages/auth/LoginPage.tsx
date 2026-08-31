@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Sparkles, Mail, User as UserIcon, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { authService } from '../../services/authService';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { GoogleOAuthModal } from '../../components/auth/GoogleOAuthModal';
 import { toast } from 'sonner';
 
 export const LoginPage: React.FC = () => {
@@ -16,10 +15,11 @@ export const LoginPage: React.FC = () => {
   const { login } = useAuthStore();
   const { addNotification } = useNotificationStore();
 
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
 
   const performLogin = (userData: any, token: string, refresh: string) => {
     login(userData, token, refresh);
@@ -31,115 +31,124 @@ export const LoginPage: React.FC = () => {
       emailDispatched: true,
     });
 
-    toast.success(`Welcome, ${userData.name}!`);
+    toast.success(`Welcome back, ${userData.name}!`);
     navigate(from, { replace: true });
-  };
-
-  const handleGoogleSuccess = async (googleData: { name: string; email: string; avatar: string }) => {
-    setIsLoading(true);
-    try {
-      const res = await authService.googleLogin(googleData);
-      performLogin(res.data.user, res.data.accessToken, res.data.refreshToken);
-    } catch (err: any) {
-      toast.error(err.message || 'Google sign-in failed');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      toast.error('Please enter your Gmail / Email address');
+      toast.error('Please enter your email or username');
       return;
     }
+    if (!password.trim()) {
+      toast.error('Please enter your password');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const derivedName = name.trim() || email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-      const res = await authService.login({ name: derivedName, email: email.trim() });
+      const res = await authService.login({
+        email: email.trim(),
+        password: password.trim(),
+      });
       performLogin(res.data.user, res.data.accessToken, res.data.refreshToken);
     } catch (err: any) {
-      toast.error(err.message || 'Login failed');
+      toast.error(err.message || 'Invalid email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100">
-      <div className="w-full max-w-md p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
-        <div className="flex flex-col items-center text-center mb-8">
-          <Link to="/" className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-purple-600 flex items-center justify-center text-white shadow-glow mb-3">
-            <Sparkles className="w-5 h-5" />
+    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 transition-colors">
+      <div className="w-full max-w-md p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl relative overflow-hidden">
+        {/* Glow decoration */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col items-center text-center mb-8 relative z-10">
+          <Link to="/" className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-purple-600 flex items-center justify-center text-white shadow-glow mb-3 transform hover:scale-105 transition-transform">
+            <Sparkles className="w-6 h-6" />
           </Link>
-          <h2 className="text-xl font-bold">Sign In to DocuFlow AI</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Instant passwordless access with your Gmail and Name</p>
+          <h2 className="text-2xl font-bold tracking-tight">Sign In to DocuFlow AI</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter your verified email and password to access your workspace</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
           <Input
-            label="Full Name"
-            type="text"
-            placeholder="Your Name (e.g. Alex Smith)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            leftIcon={<UserIcon className="w-4 h-4" />}
+            label="Email Address"
+            type="email"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            leftIcon={<Mail className="w-4 h-4 text-slate-400" />}
+            required
             autoFocus
           />
 
-          <Input
-            label="Gmail / Email Address"
-            type="email"
-            placeholder="yourname@gmail.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            leftIcon={<Mail className="w-4 h-4" />}
-            required
-          />
-
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Password-free instant login with zero security friction</span>
+          <div className="relative">
+            <Input
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              leftIcon={<Lock className="w-4 h-4 text-slate-400" />}
+              rightIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-slate-400 hover:text-slate-200 focus:outline-none transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              }
+              required
+            />
           </div>
 
-          <Button type="submit" variant="gradient" size="md" className="w-full shadow-glow font-bold mt-2" isLoading={isLoading} rightIcon={<ArrowRight className="w-4 h-4" />}>
-            Enter Workspace
+          <div className="flex items-center justify-between text-xs pt-1">
+            <label className="flex items-center gap-2 cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-700 text-brand-600 focus:ring-brand-500 bg-white dark:bg-slate-800"
+              />
+              <span>Remember me</span>
+            </label>
+
+            <Link
+              to="/forgot-password"
+              className="text-brand-500 hover:text-brand-400 font-medium hover:underline transition-colors"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          <Button
+            type="submit"
+            variant="gradient"
+            size="md"
+            className="w-full shadow-glow font-bold mt-2 py-2.5"
+            isLoading={isLoading}
+            rightIcon={<ArrowRight className="w-4 h-4" />}
+          >
+            Sign In to Account
           </Button>
         </form>
 
-        <div className="relative my-6 text-center text-xs text-slate-500">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-200 dark:border-slate-800" />
-          </div>
-          <span className="relative px-3 bg-white dark:bg-slate-900">Or continue with</span>
+        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Don't have an account yet?{' '}
+            <Link to="/register" className="text-brand-500 hover:text-brand-400 font-bold hover:underline ml-1">
+              Create Free Account &rarr;
+            </Link>
+          </p>
         </div>
-
-        {/* 1-Click Google OAuth Sign-in Button */}
-        <button
-          type="button"
-          onClick={() => setIsGoogleModalOpen(true)}
-          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-all text-xs font-semibold shadow-xs"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-          </svg>
-          <span>Continue with Google</span>
-        </button>
-
-        <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
-          New user? Simply enter your Name & Gmail above to start free!
-        </p>
       </div>
-
-      {/* Google OAuth Modal Window */}
-      <GoogleOAuthModal
-        isOpen={isGoogleModalOpen}
-        onClose={() => setIsGoogleModalOpen(false)}
-        onSuccess={handleGoogleSuccess}
-      />
     </div>
   );
 };

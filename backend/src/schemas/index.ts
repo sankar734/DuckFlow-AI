@@ -1,16 +1,16 @@
 import { z } from 'zod';
 
 export const registerSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().min(1, 'Full name is required'),
   email: z.string().email('Invalid email address'),
-  password: z.string().optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
   phone: z.string().optional(),
 });
 
 export const loginSchema = z.object({
+  email: z.string().min(1, 'Email or username is required'),
+  password: z.string().min(1, 'Password is required'),
   name: z.string().optional(),
-  email: z.string().email('Invalid email address'),
-  password: z.string().optional(),
 });
 
 export const otpVerifySchema = z.object({
