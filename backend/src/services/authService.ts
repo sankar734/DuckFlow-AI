@@ -324,46 +324,47 @@ export class AuthService {
           lastLoginAt: new Date(),
         });
 
-      // Dispatch Welcome Email
-      emailService.sendWelcomeRegistrationEmail(user.email, user.name).catch(() => {});
+        // Dispatch Welcome Email
+        emailService.sendWelcomeRegistrationEmail(user.email, user.name).catch(() => {});
 
-      try {
-        await ActivityLog.create({
-          userId: user._id,
-          action: 'USER_REGISTER',
-          resourceType: 'User',
-          resourceId: user._id.toString(),
-        });
-      } catch {}
+        try {
+          await ActivityLog.create({
+            userId: user._id,
+            action: 'USER_REGISTER',
+            resourceType: 'User',
+            resourceId: user._id.toString(),
+          });
+        } catch {}
 
-      const accessToken = generateAccessToken({ userId: user._id.toString(), email: user.email, role: user.role });
-      const refreshToken = generateRefreshToken({ userId: user._id.toString(), email: user.email, role: user.role });
+        const accessToken = generateAccessToken({ userId: user._id.toString(), email: user.email, role: user.role });
+        const refreshToken = generateRefreshToken({ userId: user._id.toString(), email: user.email, role: user.role });
 
-      return { user, accessToken, refreshToken };
-    } catch (err: any) {
-      if (err instanceof AppError) throw err;
-
-      const fallbackId = `usr_${Date.now()}`;
-      const fallbackUser = {
-        _id: fallbackId,
-        name,
-        email,
-        role: UserRole.USER,
-        planId: 'free',
-        storageLimit: 50 * 1024 * 1024 * 1024,
-        aiCredits: 100,
-        aiCreditsUsed: 0,
-        emailVerified: true,
-        lastLoginAt: new Date(),
-      };
-
-      emailService.sendWelcomeRegistrationEmail(email, name).catch(() => {});
-
-      const accessToken = generateAccessToken({ userId: fallbackId, email, role: 'USER' });
-      const refreshToken = generateRefreshToken({ userId: fallbackId, email, role: 'USER' });
-
-      return { user: fallbackUser, accessToken, refreshToken };
+        return { user, accessToken, refreshToken };
+      } catch (err: any) {
+        if (err instanceof AppError) throw err;
+      }
     }
+
+    const fallbackId = `usr_${Date.now()}`;
+    const fallbackUser = {
+      _id: fallbackId,
+      name,
+      email,
+      role: UserRole.USER,
+      planId: 'free',
+      storageLimit: 50 * 1024 * 1024 * 1024,
+      aiCredits: 100,
+      aiCreditsUsed: 0,
+      emailVerified: true,
+      lastLoginAt: new Date(),
+    };
+
+    emailService.sendWelcomeRegistrationEmail(email, name).catch(() => {});
+
+    const accessToken = generateAccessToken({ userId: fallbackId, email, role: 'USER' });
+    const refreshToken = generateRefreshToken({ userId: fallbackId, email, role: 'USER' });
+
+    return { user: fallbackUser, accessToken, refreshToken };
   }
 
   async sendOTP(email: string): Promise<{ message: string }> {
