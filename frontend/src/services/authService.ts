@@ -13,6 +13,14 @@ export const authService = {
     return await api.post('/auth/register', data);
   },
 
+  sendRegisterOTP: async (data: { name?: string; email: string; password?: string }) => {
+    return await api.post('/auth/send-register-otp', data);
+  },
+
+  verifyRegisterOTP: async (data: { name: string; email: string; password?: string; otp: string; phone?: string }) => {
+    return await api.post('/auth/verify-register-otp', data);
+  },
+
   checkEmail: async (email: string, mode: 'register' | 'login' = 'register') => {
     return await api.post('/auth/check-email', { email, mode });
   },

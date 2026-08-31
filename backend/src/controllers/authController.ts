@@ -15,6 +15,26 @@ export class AuthController {
     }
   }
 
+  async sendRegisterOTP(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, name, password } = req.body;
+      const result = await authService.sendRegisterOTP({ email, name, password });
+      sendSuccess(res, result, 'Verification code sent to your email');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async verifyRegisterOTP(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, otp, name, password } = req.body;
+      const result = await authService.registerWithOTP({ email, otp, name, password });
+      sendSuccess(res, result, 'Account verified and registered successfully', 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async login(req: Request, res: Response, next: NextFunction) {
     try {
       const validated = loginSchema.parse(req.body);

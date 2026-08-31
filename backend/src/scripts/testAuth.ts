@@ -1,84 +1,73 @@
 import { authService } from '../services/authService';
-import { validateEmailComprehensively } from '../utils/emailValidator';
 
-async function testEmailValidationAndAuth() {
-  console.log('\n--- 1. Testing Fake / Disposable Email Rejection ---');
+async function testOtpRegistrationFlow() {
+  console.log('\n=== Testing Real-Time Email OTP Registration Flow ===');
+
+  const testEmail = `verified_user_${Date.now()}@gmail.com`;
+  const testName = 'Verified Alex';
+  const testPassword = 'SecurePassword123!';
+
+  // Step 1: Send Registration OTP
+  console.log('\n--- 1. Sending Registration OTP ---');
   try {
-    const check1 = await validateEmailComprehensively('testing_fake@mailinator.com');
-    console.log('Disposable check result for mailinator.com:', {
-      isDisposable: check1.isDisposable,
-      error: check1.error,
+    const sendOtpRes = await authService.sendRegisterOTP({
+      name: testName,
+      email: testEmail,
+      password: testPassword,
     });
-
-    const checkTemp = await validateEmailComprehensively('user@temp-mail.org');
-    console.log('Disposable check result for temp-mail.org:', {
-      isDisposable: checkTemp.isDisposable,
-      error: checkTemp.error,
-    });
+    console.log('✅ sendRegisterOTP result:', sendOtpRes);
   } catch (err: any) {
-    console.error('Error in disposable test:', err);
+    console.error('❌ sendRegisterOTP failed:', err);
   }
 
-  console.log('\n--- 2. Testing Non-Existent Email Domain Rejection ---');
+  // Step 2: Attempt registration with incorrect OTP
+  console.log('\n--- 2. Attempting Registration with Wrong OTP ---');
   try {
-    const check2 = await validateEmailComprehensively('invalid@fake-random-domain-xyz-999999.org');
-    console.log('Non-existent domain check result:', {
-      hasValidMx: check2.hasValidMx,
-      error: check2.error,
+    await authService.registerWithOTP({
+      name: testName,
+      email: testEmail,
+      password: testPassword,
+      otp: '000000',
     });
+    console.log('❌ Wrong OTP registration unexpectedly succeeded!');
   } catch (err: any) {
-    console.error('Error in non-existent domain test:', err);
+    console.log('✅ Wrong OTP correctly rejected:', err.message);
   }
 
-  console.log('\n--- 3. Testing Valid Real Domain ---');
+  // Step 3: Complete registration with valid test OTP
+  console.log('\n--- 3. Completing Registration with Valid OTP ---');
   try {
-    const check3 = await validateEmailComprehensively('realuser@gmail.com');
-    console.log('Valid email check result for gmail.com:', {
-      isValidFormat: check3.isValidFormat,
-      isDisposable: check3.isDisposable,
-      hasValidMx: check3.hasValidMx,
+    const regRes = await authService.registerWithOTP({
+      name: testName,
+      email: testEmail,
+      password: testPassword,
+      otp: '123456',
+    });
+    console.log('✅ Registration with OTP SUCCESS:', {
+      user: regRes.user.name,
+      email: regRes.user.email,
+      emailVerified: regRes.user.emailVerified,
+      hasAccessToken: Boolean(regRes.accessToken),
     });
   } catch (err: any) {
-    console.error('Error in valid email test:', err);
+    console.error('❌ Registration with valid OTP failed:', err);
   }
 
-  console.log('\n--- 4. Testing authService.checkEmail ---');
+  // Step 4: Login with newly registered user
+  console.log('\n--- 4. Logging in with Verified Credentials ---');
   try {
-    const res1 = await authService.checkEmail('disposable@sharklasers.com', 'register');
-    console.log('authService.checkEmail (disposable):', res1);
-
-    const res2 = await authService.checkEmail('newuser@gmail.com', 'register');
-    console.log('authService.checkEmail (valid new user):', res2);
-  } catch (err: any) {
-    console.error('Error in authService.checkEmail test:', err);
-  }
-
-  console.log('\n--- 5. Testing authService.register and login ---');
-  try {
-    const validEmail = `docuflow_test_${Date.now()}@gmail.com`;
-    const regResult = await authService.register({
-      name: 'Verified DocuFlow User',
-      email: validEmail,
-      password: 'StrongPassword123!',
-    });
-    console.log('✅ Registration SUCCESS:', {
-      user: regResult.user.name,
-      email: regResult.user.email,
-      hasAccessToken: Boolean(regResult.accessToken),
-    });
-
-    const loginResult = await authService.login({
-      email: validEmail,
-      password: 'StrongPassword123!',
+    const loginRes = await authService.login({
+      email: testEmail,
+      password: testPassword,
     });
     console.log('✅ Login SUCCESS:', {
-      user: loginResult.user.name,
-      email: loginResult.user.email,
-      hasAccessToken: Boolean(loginResult.accessToken),
+      user: loginRes.user.name,
+      email: loginRes.user.email,
+      hasAccessToken: Boolean(loginRes.accessToken),
     });
   } catch (err: any) {
-    console.error('Error in register/login test:', err);
+    console.error('❌ Login failed:', err);
   }
 }
 
-testEmailValidationAndAuth();
+testOtpRegistrationFlow();

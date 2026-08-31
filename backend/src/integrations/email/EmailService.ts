@@ -251,20 +251,72 @@ export class EmailService {
     await this.sendWelcomeRegistrationEmail(to, name);
   }
 
-  async sendOTPEmail(to: string, otp: string): Promise<void> {
-    logger.info(`[EMAIL] Sending OTP (${otp}) to ${to}`);
-    if (this.transporter) {
-      try {
-        await this.transporter.sendMail({
-          from: `"DocuFlow AI" <${env.SMTP_USER}>`,
-          to,
-          subject: `🔐 Your DocuFlow AI OTP Verification Code: ${otp}`,
-          text: `Your verification code is ${otp}. It expires in 10 minutes.`,
-        });
-      } catch (err: any) {
-        logger.warn(`[EMAIL] OTP error: ${err?.message || err}`);
-      }
+  async sendRegistrationOTPEmail(to: string, otp: string, name: string = 'User'): Promise<void> {
+    logger.info(`[EMAIL] Dispatching Registration OTP (${otp}) to ${to} (${name})`);
+    if (!this.transporter) {
+      this.initTransporter();
     }
+
+    const html = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 40px 20px; max-width: 540px; margin: 0 auto; border-radius: 16px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="display: inline-block; padding: 10px 18px; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); border-radius: 12px; margin-bottom: 12px;">
+            <span style="font-size: 20px; font-weight: bold; color: #ffffff; letter-spacing: 0.5px;">DocuFlow AI</span>
+          </div>
+          <h1 style="color: #ffffff; font-size: 22px; margin: 6px 0 2px; font-weight: 700;">Email Verification Code</h1>
+          <p style="color: #94a3b8; font-size: 13px; margin: 0;">Complete your account registration</p>
+        </div>
+        
+        <div style="background-color: #131b2e; padding: 28px; border-radius: 14px; border: 1px solid #23314f; text-align: center; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);">
+          <p style="color: #cbd5e1; font-size: 14px; margin-top: 0; line-height: 1.5;">
+            Hello <strong>${name}</strong>,<br/>
+            Please use the 6-digit verification code below to verify your email address and activate your <strong>DocuFlow AI</strong> account:
+          </p>
+
+          <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%); border: 1px dashed #6366f1; border-radius: 12px; padding: 20px 12px; margin: 24px 0;">
+            <div style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #818cf8; text-shadow: 0 0 20px rgba(99,102,241,0.5);">
+              ${otp}
+            </div>
+            <div style="color: #94a3b8; font-size: 11px; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px;">
+              ⏱️ Valid for 10 minutes
+            </div>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 12px; margin: 0; line-height: 1.5;">
+            Enter this code in the registration window to finish creating your account.
+          </p>
+
+          <div style="margin-top: 24px; border-top: 1px solid #1e293b; padding-top: 16px; text-align: left;">
+            <p style="color: #64748b; font-size: 11px; margin: 0; line-height: 1.5;">
+              🔒 <strong>Security Warning:</strong> Never share this code with anyone. DocuFlow AI staff will never ask for your verification code.
+            </p>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 24px; color: #64748b; font-size: 11px;">
+          &copy; ${new Date().getFullYear()} DocuFlow AI. If you did not request this, please ignore this email.
+        </div>
+      </div>
+    `;
+
+    try {
+      if (this.transporter) {
+        await this.transporter.sendMail({
+          from: `"DocuFlow AI Verification" <${env.SMTP_USER || 'noreply@docuflow.ai'}>`,
+          to,
+          subject: `🔐 Your DocuFlow AI Verification Code: ${otp}`,
+          html,
+          text: `Your DocuFlow AI registration verification code is: ${otp}. It expires in 10 minutes.`,
+        });
+        logger.info(`[EMAIL] ✅ Registration OTP email delivered to ${to}`);
+      }
+    } catch (err: any) {
+      logger.warn(`[EMAIL] OTP dispatch note: ${err?.message || err}`);
+    }
+  }
+
+  async sendOTPEmail(to: string, otp: string): Promise<void> {
+    await this.sendRegistrationOTPEmail(to, otp, 'there');
   }
 
   async sendPasswordResetEmail(to: string, resetLink: string): Promise<void> {
