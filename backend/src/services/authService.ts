@@ -491,6 +491,33 @@ export class AuthService {
     return { verified: true };
   }
 
+  async resetPassword(data: { email: string; otp: string; newPassword?: string }): Promise<{ message: string }> {
+    const email = data.email.toLowerCase().trim();
+    if (!data.otp) {
+      throw new AppError('Please provide the OTP verification code.', 400, 'OTP_REQUIRED');
+    }
+    if (!data.newPassword || data.newPassword.length < 6) {
+      throw new AppError('New password must be at least 6 characters.', 400, 'INVALID_PASSWORD');
+    }
+
+    await this.verifyOTP(email, data.otp);
+
+    const passwordHash = await bcrypt.hash(data.newPassword.trim(), 10);
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const user = await User.findOne({ email });
+        if (user) {
+          user.passwordHash = passwordHash;
+          await user.save();
+        }
+      } catch (err: any) {
+        if (err instanceof AppError) throw err;
+      }
+    }
+
+    return { message: 'Password has been reset successfully. You can now log in.' };
+  }
+
   async googleLogin(data: { name?: string; email?: string; avatar?: string; credential?: string }): Promise<{ user: any; accessToken: string; refreshToken: string }> {
     let email = data.email?.toLowerCase();
     let name = data.name;

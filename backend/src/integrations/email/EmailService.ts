@@ -193,7 +193,7 @@ export class EmailService {
             <h3 style="color: #818cf8; font-size: 14px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.5px;">✨ Included with your Free Plan:</h3>
             <ul style="margin: 0; padding-left: 20px; color: #e2e8f0; font-size: 13px; line-height: 1.8;">
               <li><strong>100 Free AI Credits</strong> for AI Writer, PDF Chat, & Excel Insights</li>
-              <li><strong>50 GB High-Speed Cloud Storage</strong> for your documents</li>
+              <li><strong>Fast Local & Device Document Storage</strong> for your workspace</li>
               <li><strong>PDF Suite:</strong> Merge, split, compress, sign, and convert PDFs</li>
               <li><strong>Full Office Suite:</strong> Word, Excel, and PowerPoint online editors</li>
               <li><strong>Smart OCR & Scanner:</strong> Extract text and tables instantly</li>

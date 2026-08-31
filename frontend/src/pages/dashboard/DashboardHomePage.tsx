@@ -115,15 +115,15 @@ export const DashboardHomePage: React.FC = () => {
               <HardDrive className="w-6 h-6" />
             </div>
             <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">Cloud Storage</div>
-              <div className="text-xs text-slate-400">14.2 GB of 50.0 GB Used (28%)</div>
+              <div className="text-xs font-bold text-slate-900 dark:text-white">Local & Device Storage</div>
+              <div className="text-xs text-slate-400">Offline & Local Document Cache (Active)</div>
               <div className="w-48 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mt-2 overflow-hidden">
-                <div className="w-[28%] h-full bg-brand-500 rounded-full" />
+                <div className="w-[100%] h-full bg-emerald-500 rounded-full" />
               </div>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate('/settings')}>
-            Manage
+          <Button variant="outline" size="sm" onClick={() => navigate('/documents')}>
+            Browse Files
           </Button>
         </div>
 

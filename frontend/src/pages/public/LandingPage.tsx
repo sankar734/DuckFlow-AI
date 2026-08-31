@@ -272,7 +272,7 @@ export const LandingPage: React.FC = () => {
               <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Basic Word & Excel Editor</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 50 AI Credits / Month</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 5GB Cloud Storage</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Local Device Storage Access</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Standard PDF Tools</li>
               </ul>
             </div>
@@ -294,7 +294,7 @@ export const LandingPage: React.FC = () => {
               <p className="text-xs text-slate-500 mb-6">For professionals and power users needing deep AI.</p>
               <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 500 AI Credits / Month</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 50GB High-Speed Storage</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Offline & Local Storage Cache</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> AI Document & PPT Generator</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> High-Accuracy Mobile OCR</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 100 Daily Conversions</li>
@@ -315,7 +315,7 @@ export const LandingPage: React.FC = () => {
               <p className="text-xs text-slate-500 mb-6">For teams and organizations collaborating at scale.</p>
               <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 2,500 AI Credits / Month</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 250GB Team Storage</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Unlimited Local & Team Storage</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Team Workspaces & Roles</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Unlimited Bulk Conversions</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Admin Analytics & Audit Logs</li>

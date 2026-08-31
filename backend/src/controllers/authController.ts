@@ -84,6 +84,16 @@ export class AuthController {
     }
   }
 
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, otp, newPassword } = req.body;
+      const result = await authService.resetPassword({ email, otp, newPassword });
+      sendSuccess(res, result, 'Password reset successful');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async refreshToken(req: Request, res: Response, next: NextFunction) {
     try {
       const { refreshToken } = req.body;

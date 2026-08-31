@@ -199,7 +199,7 @@ export const RegisterPage: React.FC = () => {
 
       addNotification({
         title: '🎉 Email Verified & Account Created!',
-        message: `Your email (${email}) has been verified. Welcome to DocuFlow AI with 100 free AI credits and 50GB storage.`,
+        message: `Your email (${email}) has been verified. Welcome to DocuFlow AI with 100 free AI credits and local document workspace.`,
         type: 'security',
         emailDispatched: true,
       });
@@ -248,7 +248,7 @@ export const RegisterPage: React.FC = () => {
                 <Sparkles className="w-6 h-6" />
               </Link>
               <h2 className="text-2xl font-bold tracking-tight">Create Free Account</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Get instant access with 100 free AI credits and 50GB cloud storage</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Get instant access with 100 free AI credits and local document workspace</p>
             </div>
 
             <form onSubmit={handleSendOtp} className="space-y-3.5 relative z-10">

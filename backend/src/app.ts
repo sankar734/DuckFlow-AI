@@ -12,6 +12,7 @@ import { initSocketServer } from './config/socket';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import apiRoutes from './routes';
+import authRoutes from './routes/authRoutes';
 
 const app = express();
 const server = http.createServer(app);
@@ -136,9 +137,11 @@ app.get('/health', handleHealthCheck);
 app.get('/api/health', handleHealthCheck);
 app.get('/api/v1/health', handleHealthCheck);
 
-// API Routes (mounted under both /api and /api/v1)
+// API Routes (mounted under /api/v1, /api, and root / for zero-404 compatibility)
 app.use('/api/v1', apiRoutes);
 app.use('/api', apiRoutes);
+app.use('/auth', authRoutes);
+app.use('/', apiRoutes);
 
 // Centralized Error Handling
 app.use(errorHandler);

@@ -225,7 +225,7 @@ export const AIStudioPage: React.FC = () => {
             className="border-white/20 text-white hover:bg-white/10 text-xs"
             leftIcon={<HardDrive className="w-3.5 h-3.5" />}
           >
-            Manage Cloud Storage
+            Local Files & Drive
           </Button>
         </div>
       </div>

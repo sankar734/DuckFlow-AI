@@ -87,7 +87,7 @@ export const billingService = {
           features: [
             'Basic Document & Spreadsheet Editor',
             '50 AI Credits / Month',
-            '5GB Cloud Storage',
+            'Local Device Storage Access',
             '5 Daily File Conversions',
             'Standard PDF Tools',
           ],
@@ -105,7 +105,7 @@ export const billingService = {
           features: [
             'All Free Features + Unlimited Edits',
             '500 AI Credits / Month',
-            '50GB High-Speed Cloud Storage',
+            'Offline & Local Storage Cache',
             '100 Daily Universal Conversions',
             'Full AI Studio (PDF QA, Excel Analyst, PPT Maker)',
             'High-Accuracy Mobile OCR Scanner',
@@ -124,7 +124,7 @@ export const billingService = {
           features: [
             'Everything in Pro + Unlimited Team Workspaces',
             '2,500 AI Credits / Month',
-            '250GB Enterprise Cloud Storage',
+            'Unlimited Local & Team Cache',
             'Unlimited Conversions & Bulk Export',
             'Team Realtime Collaboration & Granular Roles',
             'Admin Analytics & Usage Audit Logs',
