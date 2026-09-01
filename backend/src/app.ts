@@ -157,6 +157,15 @@ connectDatabase().then(() => {
   });
 });
 
+server.on('error', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.error(`🚨 Port ${PORT} is already in use by another instance. Exiting to allow nodemon clean restart.`);
+    process.exit(1);
+  } else {
+    logger.error(`Server error: ${err.message}`);
+  }
+});
+
 // Graceful shutdown handling
 const gracefulShutdown = async (signal: string) => {
   logger.info(`Received ${signal}. Shutting down gracefully...`);
