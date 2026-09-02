@@ -94,6 +94,24 @@ export class AuthController {
     }
   }
 
+  async changePassword(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { email, otp, currentPassword, newPassword } = req.body;
+      const userEmail = email || req.user?.email;
+      const userId = req.user?.id || req.user?._id;
+      const result = await authService.changePassword({
+        userId: userId ? String(userId) : undefined,
+        email: userEmail,
+        otp,
+        currentPassword,
+        newPassword,
+      });
+      sendSuccess(res, result, 'Password updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async refreshToken(req: Request, res: Response, next: NextFunction) {
     try {
       const { refreshToken } = req.body;

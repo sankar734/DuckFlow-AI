@@ -18,6 +18,7 @@ router.post('/resend-otp', authLimiter, (req, res, next) => authController.sendO
 router.post('/verify-otp', authLimiter, (req, res, next) => authController.verifyOTP(req, res, next));
 router.post('/forgot-password', authLimiter, (req, res, next) => authController.sendOTP(req, res, next));
 router.post('/reset-password', authLimiter, (req, res, next) => authController.resetPassword(req, res, next));
+router.post('/change-password', authLimiter, (req, res, next) => authController.changePassword(req, res, next));
 
 // Session & Profile
 router.post('/refresh', (req, res, next) => authController.refreshToken(req, res, next));

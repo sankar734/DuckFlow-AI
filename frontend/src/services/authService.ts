@@ -40,4 +40,12 @@ export const authService = {
   verifyOTP: async (email: string, otp: string) => {
     return await api.post('/auth/verify-otp', { email, otp });
   },
+
+  resetPassword: async (data: { email: string; otp: string; newPassword?: string }) => {
+    return await api.post('/auth/reset-password', data);
+  },
+
+  changePassword: async (data: { email: string; otp: string; currentPassword?: string; newPassword: string }) => {
+    return await api.post('/auth/change-password', data);
+  },
 };

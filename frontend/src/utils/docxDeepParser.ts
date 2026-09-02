@@ -518,6 +518,18 @@ export class DocxDeepParser {
     const rows = Array.from(tblNode.getElementsByTagName('w:tr'));
     if (rows.length === 0) return '';
 
+    const tblPr = tblNode.getElementsByTagName('w:tblPr')[0];
+    const tblBorders = tblPr?.getElementsByTagName('w:tblBorders')[0];
+    let isBorderless = false;
+    if (tblBorders) {
+      const top = tblBorders.getElementsByTagName('w:top')[0]?.getAttribute('w:val');
+      const bottom = tblBorders.getElementsByTagName('w:bottom')[0]?.getAttribute('w:val');
+      const insideH = tblBorders.getElementsByTagName('w:insideH')[0]?.getAttribute('w:val');
+      if ((top === 'none' || top === 'nil') && (bottom === 'none' || bottom === 'nil') && (insideH === 'none' || insideH === 'nil')) {
+        isBorderless = true;
+      }
+    }
+
     let rowsHtml = '';
 
     rows.forEach((r, rIdx) => {
@@ -529,7 +541,7 @@ export class DocxDeepParser {
         
         // Shading / Background
         const shd = tcPr?.getElementsByTagName('w:shd')[0]?.getAttribute('w:fill');
-        const bgColor = shd && shd !== 'auto' && shd !== 'none' ? `#${shd}` : rIdx === 0 ? '#f8fafc' : 'transparent';
+        const bgColor = shd && shd !== 'auto' && shd !== 'none' ? `#${shd}` : isBorderless ? 'transparent' : rIdx === 0 ? '#f8fafc' : 'transparent';
 
         // Cell Width
         const tcW = tcPr?.getElementsByTagName('w:tcW')[0]?.getAttribute('w:w');
@@ -542,12 +554,12 @@ export class DocxDeepParser {
         const paragraphs = Array.from(c.getElementsByTagName('w:p'));
         const cellContent = paragraphs.map((p) => this.renderParagraph(p).html).join('');
 
-        const isHeader = rIdx === 0 && rows[0].querySelector('w:tblHeader') !== null;
+        const isHeader = !isBorderless && rIdx === 0 && rows[0].querySelector('w:tblHeader') !== null;
         const tag = isHeader ? 'th' : 'td';
 
         const cellStyles = [
-          'border: 1px solid #cbd5e1',
-          'padding: 8pt 10pt',
+          isBorderless ? 'border: none' : 'border: 1px solid #cbd5e1',
+          isBorderless ? 'padding: 4pt 6pt' : 'padding: 8pt 10pt',
           `background-color: ${bgColor}`,
           `vertical-align: ${vAlign === 'center' ? 'middle' : vAlign}`,
         ];
@@ -559,7 +571,7 @@ export class DocxDeepParser {
       rowsHtml += `<tr>${cellsHtml}</tr>`;
     });
 
-    return `<table style="width: 100%; border-collapse: collapse; margin: 16pt 0; border: 1px solid #cbd5e1; font-size: 10pt;">${rowsHtml}</table>`;
+    return `<table data-borderless="${isBorderless ? 'true' : 'false'}" style="width: 100%; border-collapse: collapse; margin: 16pt 0; ${isBorderless ? 'border: none;' : 'border: 1px solid #cbd5e1;'} font-size: 10pt;">${rowsHtml}</table>`;
   }
 
   /**

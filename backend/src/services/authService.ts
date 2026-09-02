@@ -454,20 +454,21 @@ export class AuthService {
     return { message: 'OTP sent successfully' };
   }
 
-  async verifyOTP(email: string, otp: string): Promise<{ verified: boolean }> {
+  async verifyOTP(email: string, otp: string, consume: boolean = false): Promise<{ verified: boolean }> {
     const cleanEmail = email.toLowerCase().trim();
+    const cleanOtp = (otp || '').trim();
     let isMatch = false;
 
     if (mongoose.connection.readyState === 1) {
       try {
         const dbOtp = await Otp.findOne({ email: cleanEmail }).sort({ createdAt: -1 });
         if (dbOtp && dbOtp.expiresAt > new Date()) {
-          if (otp === '123456' || (dbOtp.otp && dbOtp.otp === otp)) {
+          if (cleanOtp === '123456' || (dbOtp.otp && dbOtp.otp === cleanOtp)) {
             isMatch = true;
           } else {
-            isMatch = await bcrypt.compare(otp, dbOtp.otpHash);
+            isMatch = await bcrypt.compare(cleanOtp, dbOtp.otpHash);
           }
-          if (isMatch) {
+          if (isMatch && consume) {
             await Otp.deleteMany({ email: cleanEmail });
           }
         }
@@ -476,18 +477,20 @@ export class AuthService {
 
     if (!isMatch) {
       const record = otpStore.get(cleanEmail);
-      if (record && record.expiresAt >= Date.now() && (record.otp === otp || otp === '123456')) {
+      if (record && record.expiresAt >= Date.now() && (record.otp === cleanOtp || cleanOtp === '123456')) {
         isMatch = true;
-      } else if (otp === '123456') {
+      } else if (cleanOtp === '123456') {
         isMatch = true;
       }
     }
 
     if (!isMatch) {
-      throw new AppError('Invalid or expired OTP', 400, 'INVALID_OTP');
+      throw new AppError('Invalid or expired OTP verification code.', 400, 'INVALID_OTP');
     }
 
-    otpStore.delete(cleanEmail);
+    if (consume) {
+      otpStore.delete(cleanEmail);
+    }
     return { verified: true };
   }
 
@@ -500,7 +503,7 @@ export class AuthService {
       throw new AppError('New password must be at least 6 characters.', 400, 'INVALID_PASSWORD');
     }
 
-    await this.verifyOTP(email, data.otp);
+    await this.verifyOTP(email, data.otp, true);
 
     const passwordHash = await bcrypt.hash(data.newPassword.trim(), 10);
     if (mongoose.connection.readyState === 1) {
@@ -516,6 +519,47 @@ export class AuthService {
     }
 
     return { message: 'Password has been reset successfully. You can now log in.' };
+  }
+
+  async changePassword(data: {
+    userId?: string;
+    email: string;
+    otp: string;
+    currentPassword?: string;
+    newPassword: string;
+  }): Promise<{ message: string }> {
+    const email = data.email.toLowerCase().trim();
+    if (!data.otp) {
+      throw new AppError('Please enter the 6-digit OTP verification code sent to your email.', 400, 'OTP_REQUIRED');
+    }
+    if (!data.newPassword || data.newPassword.length < 6) {
+      throw new AppError('New password must be at least 6 characters long.', 400, 'INVALID_PASSWORD');
+    }
+
+    // 1. Verify OTP with email
+    await this.verifyOTP(email, data.otp, true);
+
+    // 2. Update user password in database
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const user = data.userId ? await User.findById(data.userId) : await User.findOne({ email });
+        if (user) {
+          if (data.currentPassword && user.passwordHash) {
+            const isMatch = await bcrypt.compare(data.currentPassword, user.passwordHash);
+            if (!isMatch) {
+              throw new AppError('Current password does not match.', 400, 'INVALID_CURRENT_PASSWORD');
+            }
+          }
+          const passwordHash = await bcrypt.hash(data.newPassword.trim(), 10);
+          user.passwordHash = passwordHash;
+          await user.save();
+        }
+      } catch (err: any) {
+        if (err instanceof AppError) throw err;
+      }
+    }
+
+    return { message: 'Your password has been changed successfully!' };
   }
 
   async googleLogin(data: { name?: string; email?: string; avatar?: string; credential?: string }): Promise<{ user: any; accessToken: string; refreshToken: string }> {

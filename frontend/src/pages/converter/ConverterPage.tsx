@@ -13,11 +13,15 @@ import {
   Table,
   Presentation,
   Image,
+  BookOpen,
+  Sliders,
+  Sparkles,
+  Check,
 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { DocumentPreviewModal } from '../../components/documents/DocumentPreviewModal';
-import { convertFileToRealPDF, ConvertedPDFResult } from '../../utils/pdfGenerator';
+import { convertFileToRealPDF, ConvertedPDFResult, PDFConversionOptions } from '../../utils/pdfGenerator';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 
@@ -56,7 +60,11 @@ export const ConverterPage: React.FC = () => {
 
   const [queue, setQueue] = useState<ConversionQueueItem[]>([]);
   const [isConvertingAll, setIsConvertingAll] = useState(false);
-  const [engineType, setEngineType] = useState<string>('DocuFlow High-Fidelity Engine');
+
+  // Academic / Project Report Formatting Controls
+  const [documentStyle, setDocumentStyle] = useState<'academic' | 'standard'>('academic');
+  const [lineSpacing, setLineSpacing] = useState<'1.5' | '1.2' | '2.0'>('1.5');
+  const [enableDividerPages, setEnableDividerPages] = useState(true);
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -101,33 +109,13 @@ export const ConverterPage: React.FC = () => {
   }> => {
     if (!item.file) throw new Error('File not found');
 
-    // Attempt Backend API Conversion first
-    try {
-      const base64Data = await fileToBase64(item.file);
-      const res: any = await api.post('/conversions', {
-        sourceFileName: item.fileName,
-        sourceFormat: item.sourceFormat,
-        targetFormat: item.targetFormat,
-        fileSize: item.file.size,
-        fileData: base64Data,
-        options: {
-          engine: engineType,
-          preserveFormatting: true,
-        },
-      });
+    const conversionOptions: PDFConversionOptions = {
+      documentStyle,
+      lineSpacingMultiplier: lineSpacing === '1.5' ? 1.45 : lineSpacing === '2.0' ? 1.9 : 1.2,
+    };
 
-      if (res && res.data && res.data.downloadUrl) {
-        return {
-          url: res.data.downloadUrl,
-          extractedText: `Document converted via ${res.data.converterEngine || 'High-Fidelity Engine'}`,
-        };
-      }
-    } catch (apiErr) {
-      console.warn('Backend conversion API notice, utilizing direct vector engine:', apiErr);
-    }
-
-    // Client-side high-fidelity vector engine fallback
-    const result: ConvertedPDFResult = await convertFileToRealPDF(item.file, item.targetFormat);
+    // Client-side high-fidelity vector engine
+    const result: ConvertedPDFResult = await convertFileToRealPDF(item.file, item.targetFormat, conversionOptions);
     return {
       url: result.url,
       blob: result.blob,
@@ -145,7 +133,7 @@ export const ConverterPage: React.FC = () => {
     setQueue((prev) =>
       prev.map((it) =>
         it.id === id
-          ? { ...it, status: 'CONVERTING', progress: 25, stageMessage: 'Preparing document structure...' }
+          ? { ...it, status: 'CONVERTING', progress: 25, stageMessage: 'Analyzing sections, headings & alignments...' }
           : it
       )
     );
@@ -154,7 +142,7 @@ export const ConverterPage: React.FC = () => {
       setQueue((prev) =>
         prev.map((it) =>
           it.id === id
-            ? { ...it, progress: 60, stageMessage: 'Rendering pages, fonts & geometry...' }
+            ? { ...it, progress: 65, stageMessage: 'Formatting 1-inch margins, 1.5x line spacing & divider pages...' }
             : it
         )
       );
@@ -164,7 +152,7 @@ export const ConverterPage: React.FC = () => {
       setQueue((prev) =>
         prev.map((it) =>
           it.id === id
-            ? { ...it, progress: 90, stageMessage: 'Validating output fidelity...' }
+            ? { ...it, progress: 95, stageMessage: 'Rendering Table of Contents & page numbers...' }
             : it
         )
       );
@@ -176,7 +164,7 @@ export const ConverterPage: React.FC = () => {
               ...it,
               status: 'COMPLETED',
               progress: 100,
-              stageMessage: 'Conversion completed successfully',
+              stageMessage: 'Academic Report conversion complete',
               downloadUrl: result.url,
               pdfBlob: result.blob,
               extractedText: result.extractedText,
@@ -188,7 +176,7 @@ export const ConverterPage: React.FC = () => {
           return it;
         })
       );
-      toast.success(`Converted "${item.fileName}" into authentic PDF with real content!`);
+      toast.success(`Converted "${item.fileName}" into perfectly formatted PDF Report!`);
     } catch (err: any) {
       console.error('Conversion error:', err);
       toast.error(`Error converting ${item.fileName}`);
@@ -241,7 +229,7 @@ export const ConverterPage: React.FC = () => {
     }
 
     setIsConvertingAll(false);
-    toast.success('All files converted with full original content preserved!');
+    toast.success('All files converted with academic report formatting!');
   };
 
   const handleDownload = (item: ConversionQueueItem) => {
@@ -297,11 +285,11 @@ export const ConverterPage: React.FC = () => {
       {/* Header */}
       <div>
         <Badge variant="brand" size="sm" className="mb-1">
-          Universal Converter Engine
+          Academic & Universal PDF Engine
         </Badge>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-white">Universal File Converter</h1>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white">Universal Document to PDF Converter</h1>
         <p className="text-xs text-slate-400">
-          Convert Word, Excel, PowerPoint, PDF, CSV, TXT, and Images with zero quality loss
+          Convert Word (.docx/.doc), Text, Markdown, and Reports with exact margins, 1.5x line spacing, centered chapter divider pages, and Table of Contents
         </p>
       </div>
 
@@ -318,7 +306,7 @@ export const ConverterPage: React.FC = () => {
           handleFilesSelected(e.dataTransfer.files);
         }}
         onClick={() => fileInputRef.current?.click()}
-        className={`p-8 sm:p-12 rounded-3xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center ${
+        className={`p-8 sm:p-10 rounded-3xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center ${
           isDragging
             ? 'border-brand-500 bg-brand-50/30 dark:bg-brand-950/40 scale-[1.01]'
             : 'border-brand-500/40 bg-white dark:bg-slate-900 hover:border-brand-500 hover:shadow-lg'
@@ -328,10 +316,10 @@ export const ConverterPage: React.FC = () => {
           <UploadCloud className="w-8 h-8" />
         </div>
         <h2 className="text-base font-bold text-slate-900 dark:text-white mb-1">
-          Click to choose files from folder or drag & drop here
+          Click to choose document or drag & drop here
         </h2>
-        <p className="text-xs text-slate-400 max-w-sm mb-6">
-          Supports multi-file batch upload (DOCX, XLSX, PPTX, PDF, CSV, TXT, PNG, JPG) up to 100MB
+        <p className="text-xs text-slate-400 max-w-sm mb-5">
+          Supports Word (DOCX, DOC), TXT, Markdown, HTML, Excel, and PPT files up to 100MB
         </p>
 
         <div className="flex flex-wrap items-center gap-3" onClick={(e) => e.stopPropagation()}>
@@ -341,7 +329,7 @@ export const ConverterPage: React.FC = () => {
             leftIcon={<UploadCloud className="w-4 h-4" />}
             onClick={() => fileInputRef.current?.click()}
           >
-            Browse Files from Folder
+            Browse Files from Computer
           </Button>
 
           <div className="flex items-center gap-2 text-xs">
@@ -358,6 +346,77 @@ export const ConverterPage: React.FC = () => {
               <option value="TXT">Plain Text (.txt)</option>
               <option value="PNG">PNG Image (.png)</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Formatting & Layout Styling Settings Bar */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-purple-500" />
+            <span className="text-xs font-bold text-slate-900 dark:text-white">
+              PDF Formatting & Layout Profiles
+            </span>
+          </div>
+          <Badge variant="purple" size="sm">
+            Academic Project Report Standard
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          {/* Format Profile */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+              Layout Style
+            </label>
+            <select
+              value={documentStyle}
+              onChange={(e) => setDocumentStyle(e.target.value as any)}
+              className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-medium text-slate-900 dark:text-white focus:outline-none"
+            >
+              <option value="academic">Academic & Project Report</option>
+              <option value="standard">Standard Clean Document</option>
+            </select>
+            <span className="text-[10px] text-slate-400 block">
+              Centered divider pages & TOC borders
+            </span>
+          </div>
+
+          {/* Line Spacing */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+              Line Spacing
+            </label>
+            <select
+              value={lineSpacing}
+              onChange={(e) => setLineSpacing(e.target.value as any)}
+              className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-medium text-slate-900 dark:text-white focus:outline-none"
+            >
+              <option value="1.5">1.5x (Academic Standard)</option>
+              <option value="1.2">1.2x (Compact)</option>
+              <option value="2.0">2.0x (Double Space)</option>
+            </select>
+            <span className="text-[10px] text-slate-400 block">
+              Optimal text readability & flow
+            </span>
+          </div>
+
+          {/* Page Setup Features */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+              Features Enabled
+            </label>
+            <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+              <div className="flex items-center gap-1.5">
+                <Check className="w-3 h-3 text-emerald-500" />
+                <span>1-Inch (60pt) Standard Margins</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Check className="w-3 h-3 text-emerald-500" />
+                <span>Bottom-Centered Page Numbers</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

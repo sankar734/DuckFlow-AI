@@ -7,7 +7,8 @@ interface UIState {
   toggleCommandPalette: () => void;
 
   isMobileScannerOpen: boolean;
-  openMobileScanner: () => void;
+  scannerPreset: string;
+  openMobileScanner: (preset?: string) => void;
   closeMobileScanner: () => void;
 
   isAIDrawerOpen: boolean;
@@ -26,7 +27,8 @@ export const useUIStore = create<UIState>((set) => ({
   toggleCommandPalette: () => set((state) => ({ isCommandPaletteOpen: !state.isCommandPaletteOpen })),
 
   isMobileScannerOpen: false,
-  openMobileScanner: () => set({ isMobileScannerOpen: true }),
+  scannerPreset: 'all',
+  openMobileScanner: (preset?: string) => set({ isMobileScannerOpen: true, scannerPreset: preset || 'all' }),
   closeMobileScanner: () => set({ isMobileScannerOpen: false }),
 
   isAIDrawerOpen: true,

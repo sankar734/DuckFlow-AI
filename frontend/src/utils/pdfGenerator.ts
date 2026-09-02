@@ -12,6 +12,9 @@ export interface PDFConversionOptions {
   footerText?: string;
   landscape?: boolean;
   sectionSetup?: DeepParsedSection;
+  documentStyle?: 'academic' | 'standard' | 'minimal';
+  lineSpacingMultiplier?: number;
+  fontSizePt?: number;
 }
 
 export interface ConvertedPDFResult {
@@ -59,11 +62,9 @@ export const exportElementToPDF = async (element: HTMLElement, fileName: string)
     let position = 0;
     const pageHeight = pdf.internal.pageSize.getHeight();
 
-    // Add first page
     pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
     heightLeft -= pageHeight;
 
-    // Multi-page handling
     while (heightLeft > 0) {
       position = heightLeft - pdfHeight;
       pdf.addPage();
@@ -95,40 +96,37 @@ export const exportTableToPDF = (
 ): ConvertedPDFResult => {
   const isWide = headers.length > 5 || options.landscape;
   const doc = new jsPDF(isWide ? 'l' : 'p', 'pt', 'a4');
-  const pageWidth = isWide ? 842 : 595;
-  const pageHeight = isWide ? 595 : 842;
-  const margin = 40;
+  const pageWidth = isWide ? 842 : 595.3;
+  const pageHeight = isWide ? 595.3 : 841.9;
+  const margin = 50;
   const contentWidth = pageWidth - margin * 2;
 
   const baseName = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
 
-  // Header Banner
-  doc.setFillColor(16, 185, 129); // Emerald accent for tables
-  doc.rect(0, 0, pageWidth, 55, 'F');
+  // Document Title
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42);
+  doc.text(baseName.toUpperCase(), pageWidth / 2, 45, { align: 'center' });
 
-  doc.setFontSize(16);
-  doc.setTextColor(255, 255, 255);
-  doc.text(baseName, margin, 32);
-
-  doc.setFontSize(9);
-  doc.setTextColor(209, 250, 229);
-  doc.text(`Spreadsheet Data • ${data.length} rows • ${headers.length} columns`, margin, 46);
-
-  let y = 80;
+  let y = 75;
   const colCount = Math.max(headers.length, 1);
   const colWidth = contentWidth / colCount;
 
   // Header Row
-  doc.setFillColor(241, 245, 249);
+  doc.setFillColor(248, 250, 252);
   doc.rect(margin, y - 14, contentWidth, 24, 'F');
+  doc.setDrawColor(203, 213, 225);
+  doc.rect(margin, y - 14, contentWidth, 24, 'S');
+
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
   headers.forEach((h, i) => {
     const text = String(h || `Col ${i + 1}`).substring(0, 20);
-    doc.text(text, margin + 6 + i * colWidth, y);
+    doc.text(text, margin + 6 + i * colWidth, y + 2);
   });
-  y += 18;
+  y += 20;
 
   // Rows
   doc.setFont('Helvetica', 'normal');
@@ -138,26 +136,27 @@ export const exportTableToPDF = (
   let pageNumber = 1;
 
   data.forEach((row, rowIndex) => {
-    if (y > pageHeight - 50) {
-      // Add page number footer before adding new page
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
+    if (y > pageHeight - 55) {
+      doc.setFontSize(9);
+      doc.setTextColor(30, 30, 30);
+      doc.text(String(pageNumber), pageWidth / 2, pageHeight - 35, { align: 'center' });
 
       doc.addPage();
       pageNumber++;
       y = 50;
 
-      // Repeat Table Header on new page
-      doc.setFillColor(241, 245, 249);
+      doc.setFillColor(248, 250, 252);
       doc.rect(margin, y - 14, contentWidth, 24, 'F');
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(margin, y - 14, contentWidth, 24, 'S');
+
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(15, 23, 42);
       headers.forEach((h, i) => {
-        doc.text(String(h).substring(0, 20), margin + 6 + i * colWidth, y);
+        doc.text(String(h).substring(0, 20), margin + 6 + i * colWidth, y + 2);
       });
-      y += 18;
+      y += 20;
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(51, 65, 85);
@@ -165,24 +164,25 @@ export const exportTableToPDF = (
 
     if (rowIndex % 2 === 1) {
       doc.setFillColor(248, 250, 252);
-      doc.rect(margin, y - 11, contentWidth, 16, 'F');
+      doc.rect(margin, y - 11, contentWidth, 18, 'F');
     }
+
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(margin, y - 11, contentWidth, 18, 'S');
 
     row.forEach((cell, cellIndex) => {
       if (cellIndex < headers.length) {
         const val = String(cell || '').substring(0, 24);
-        doc.text(val, margin + 6 + cellIndex * colWidth, y);
+        doc.text(val, margin + 6 + cellIndex * colWidth, y + 2);
       }
     });
-    y += 16;
+    y += 18;
   });
 
-  // Footer on last page
-  doc.setFontSize(8);
-  doc.setTextColor(148, 163, 184);
-  doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setTextColor(30, 30, 30);
+  doc.text(String(pageNumber), pageWidth / 2, pageHeight - 35, { align: 'center' });
 
-  // Optional Watermark
   if (options.watermarkText) {
     applyWatermark(doc, options.watermarkText, pageWidth, pageHeight, pageNumber);
   }
@@ -210,14 +210,14 @@ export const exportSlidesToPDF = (
 ): ConvertedPDFResult => {
   const doc = new jsPDF('l', 'pt', 'a4');
   const pageWidth = 842;
-  const pageHeight = 595;
+  const pageHeight = 595.3;
   const baseName = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
 
   const gradients = [
-    { bg: [30, 27, 75], accent: [99, 102, 241], bullet: [129, 140, 248] }, // Indigo
-    { bg: [15, 23, 42], accent: [59, 130, 246], bullet: [96, 165, 250] },  // Blue/Slate
-    { bg: [6, 78, 59], accent: [16, 185, 129], bullet: [52, 211, 153] },   // Emerald
-    { bg: [67, 20, 7], accent: [245, 158, 11], bullet: [251, 191, 36] },   // Amber
+    { bg: [30, 27, 75], accent: [99, 102, 241], bullet: [129, 140, 248] },
+    { bg: [15, 23, 42], accent: [59, 130, 246], bullet: [96, 165, 250] },
+    { bg: [6, 78, 59], accent: [16, 185, 129], bullet: [52, 211, 153] },
+    { bg: [67, 20, 7], accent: [245, 158, 11], bullet: [251, 191, 36] },
   ];
 
   slides.forEach((slide, idx) => {
@@ -225,28 +225,23 @@ export const exportSlidesToPDF = (
 
     const theme = gradients[idx % gradients.length];
 
-    // Background slide canvas
     doc.setFillColor(theme.bg[0], theme.bg[1], theme.bg[2]);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Title
     doc.setFontSize(26);
     doc.setTextColor(255, 255, 255);
     doc.text(slide.title || `Slide ${idx + 1}`, 60, 90);
 
-    // Subtitle
     if (slide.subtitle) {
       doc.setFontSize(13);
       doc.setTextColor(196, 181, 253);
       doc.text(slide.subtitle, 60, 118);
     }
 
-    // Divider
     doc.setDrawColor(theme.accent[0], theme.accent[1], theme.accent[2]);
     doc.setLineWidth(2);
     doc.line(60, 135, 780, 135);
 
-    // Slide Content Bullets
     doc.setFontSize(15);
     doc.setTextColor(241, 245, 249);
     let bulletY = 185;
@@ -261,7 +256,6 @@ export const exportSlidesToPDF = (
       bulletY += lines.length * 24 + 14;
     });
 
-    // Slide Footer
     doc.setFontSize(9);
     doc.setTextColor(148, 163, 184);
     doc.text(`${baseName} • Slide ${idx + 1} of ${slides.length}`, 60, 560);
@@ -286,8 +280,6 @@ export const exportSlidesToPDF = (
 
 /**
  * Universal High-Accuracy Document to PDF Converter Engine
- * Extracts REAL content from uploaded File (Word .docx/.doc, Excel .xlsx/.csv, PowerPoint .pptx, Text, HTML, Images)
- * and produces genuine multi-page PDFs with accurate content and zero placeholder dummy text.
  */
 export const convertFileToRealPDF = async (
   file: File,
@@ -296,13 +288,11 @@ export const convertFileToRealPDF = async (
 ): Promise<ConvertedPDFResult> => {
   const fileName = file.name;
   const lowerName = fileName.toLowerCase();
-  const baseName = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
 
   // 1. WORD DOCUMENT (.docx, .doc, .rtf, .odt)
   if (lowerName.endsWith('.docx')) {
     try {
       const arrayBuffer = await file.arrayBuffer();
-      // Use OOXML Deep Parser for exact section margins, fonts, and media
       const deepParsed = await docxDeepParser.parse(arrayBuffer, fileName);
       return generateFormattedDocumentPDF(
         fileName,
@@ -311,7 +301,6 @@ export const convertFileToRealPDF = async (
         {
           ...options,
           landscape: deepParsed.sectionSetup.orientation === 'landscape',
-          headerTitle: deepParsed.sectionSetup.headerText,
         },
         deepParsed.sectionSetup
       );
@@ -451,10 +440,86 @@ export const convertFileToRealPDF = async (
   return generateFormattedDocumentPDF(fileName, rawText, isHtml ? rawText : undefined, options);
 };
 
+const CHAPTER_DIVIDER_TITLES = [
+  'TABLE OF CONTENTS',
+  'INTRODUCTION',
+  'SYSTEM ANALYSIS',
+  'SYSTEM ENVIRONMENTS',
+  'SYSTEM REQUIREMENTS',
+  'SYSTEM DESIGN',
+  'SYSTEM TESTING',
+  'SYSTEM IMPLEMENTATION',
+  'APPENDIX',
+  'FUTURE ENHANCEMENT',
+  'CONCLUSION',
+  'BIBLIOGRAPHY',
+  'ACKNOWLEDGEMENT',
+  'ABSTRACT',
+  'DECLARATION',
+  'CERTIFICATE',
+  'BONAFIDE CERTIFICATE',
+  'INDEX',
+];
+
+function isChapterDivider(text: string): boolean {
+  const clean = text.trim().toUpperCase().replace(/[:#]/g, '').trim();
+  if (CHAPTER_DIVIDER_TITLES.includes(clean)) return true;
+  if (/^(CHAPTER|SECTION)\s+\d+(\s*:\s*[A-Z\s]+)?$/i.test(clean)) return true;
+  return false;
+}
+
 /**
- * Generates high-fidelity formatted document PDF with real extracted paragraphs, alignments, tables, and pagination
+ * Checks if text is a centered Certificate or College Heading
  */
-function generateFormattedDocumentPDF(
+function isCertificateHeader(text: string): boolean {
+  const upper = text.toUpperCase().trim();
+  return (
+    upper.includes('DEPARTMENT OF') ||
+    upper.includes('BONAFIDE CERTIFICATE') ||
+    upper.includes('COLLEGE OF') ||
+    upper.includes('UNIVERSITY') ||
+    upper.includes('SUBMITTED FOR THE VIVA-VOCE')
+  );
+}
+
+/**
+ * Checks if text represents a two-column signature line (e.g. Internal Guide   Head of Dept)
+ */
+function parseTwoColumnLine(text: string): { left: string; right: string } | null {
+  // 1. Tab separated
+  if (text.includes('\t')) {
+    const parts = text.split(/\t+/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 2) {
+      return { left: parts[0], right: parts[1] };
+    }
+  }
+
+  // 2. 3 or more consecutive spaces
+  if (/\s{3,}/.test(text)) {
+    const parts = text.split(/\s{3,}/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 2 && parts[0].length < 40 && parts[1].length < 40) {
+      return { left: parts[0], right: parts[1] };
+    }
+  }
+
+  // 3. Common signature pairs
+  const upper = text.toUpperCase();
+  if (upper.includes('INTERNAL GUIDE') && upper.includes('HEAD OF')) {
+    const idx = upper.indexOf('HEAD OF');
+    return { left: text.substring(0, idx).trim(), right: text.substring(idx).trim() };
+  }
+  if (upper.includes('INTERNAL EXAMINER') && upper.includes('EXTERNAL EXAMINER')) {
+    const idx = upper.indexOf('EXTERNAL EXAMINER');
+    return { left: text.substring(0, idx).trim(), right: text.substring(idx).trim() };
+  }
+
+  return null;
+}
+
+/**
+ * High-Fidelity Academic & Report Document PDF Generator
+ */
+export function generateFormattedDocumentPDF(
   fileName: string,
   rawText: string,
   htmlContent?: string,
@@ -462,218 +527,425 @@ function generateFormattedDocumentPDF(
   sectionSetup?: DeepParsedSection
 ): ConvertedPDFResult {
   const isLandscape = options.landscape || sectionSetup?.orientation === 'landscape';
-  const widthPt = sectionSetup?.pageSize?.widthPt || (isLandscape ? 842 : 595.3);
+  const widthPt = sectionSetup?.pageSize?.widthPt || (isLandscape ? 841.9 : 595.3); // A4 Standard
   const heightPt = sectionSetup?.pageSize?.heightPt || (isLandscape ? 595.3 : 841.9);
-  const marginLeft = sectionSetup?.margins?.leftPt || 45;
-  const marginRight = sectionSetup?.margins?.rightPt || 45;
-  const marginTop = sectionSetup?.margins?.topPt || 50;
-  const marginBottom = sectionSetup?.margins?.bottomPt || 50;
-  const margin = marginLeft;
+
+  // Standard Academic 1-Inch Margins
+  const marginLeft = 60;
+  const marginRight = 60;
+  const marginTop = 55;
+  const marginBottom = 55;
 
   const doc = new jsPDF({
     orientation: isLandscape ? 'l' : 'p',
     unit: 'pt',
     format: [widthPt, heightPt],
   });
+
   const pageWidth = widthPt;
   const pageHeight = heightPt;
   const contentWidth = pageWidth - marginLeft - marginRight;
   const baseName = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
 
-  // Header Banner
-  doc.setFillColor(43, 87, 154); // Professional Navy Accent
-  doc.rect(0, 0, pageWidth, 48, 'F');
-
-  doc.setFontSize(14);
-  doc.setTextColor(255, 255, 255);
-  doc.text(baseName, marginLeft, 28);
-
-  doc.setFontSize(8.5);
-  doc.setTextColor(224, 231, 255);
-  doc.text(
-    `${options.headerTitle || 'DocuFlow AI Verified Output'} • ${sectionSetup?.pageSize?.name || 'A4'} Layout`,
-    marginLeft,
-    40
-  );
-
-  let y = marginTop + 20;
+  let y = marginTop;
   let pageNumber = 1;
 
-  const checkPageOverflow = (neededHeight: number = 25) => {
-    if (y + neededHeight > pageHeight - marginBottom) {
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
+  const drawPageNumber = (pNum: number) => {
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(30, 30, 30);
+    doc.text(String(pNum), pageWidth / 2, pageHeight - 35, { align: 'center' });
+  };
 
-      doc.addPage();
-      pageNumber++;
-      y = marginTop;
+  const advanceToNewPage = () => {
+    drawPageNumber(pageNumber);
+    doc.addPage();
+    pageNumber++;
+    y = marginTop;
+  };
+
+  const checkOverflow = (neededHeight: number): boolean => {
+    if (y + neededHeight > pageHeight - marginBottom) {
+      advanceToNewPage();
       return true;
     }
     return false;
   };
 
-  // If we have rich HTML content, parse elements for alignment & structure
+  // -------------------------------------------------------------
+  // 1. RICH HTML PARSING (from DOCX Deep Parser or HTML upload)
+  // -------------------------------------------------------------
   if (htmlContent && htmlContent.includes('<')) {
     try {
       const parser = new DOMParser();
       const parsedDoc = parser.parseFromString(htmlContent, 'text/html');
       const nodes = Array.from(parsedDoc.body.children);
 
-      for (const node of nodes) {
+      for (let nIdx = 0; nIdx < nodes.length; nIdx++) {
+        const node = nodes[nIdx];
         const tagName = node.tagName.toLowerCase();
         const style = node.getAttribute('style') || '';
         const alignAttr = node.getAttribute('align') || '';
-        
-        let align: 'left' | 'center' | 'right' | 'justify' = 'left';
-        if (style.includes('text-align: center') || alignAttr === 'center') align = 'center';
-        else if (style.includes('text-align: right') || alignAttr === 'right') align = 'right';
-        else if (style.includes('text-align: justify') || alignAttr === 'justify') align = 'justify';
+        const textContent = (node.textContent || '').trim();
 
-        // Check for page break element
-        if (node.classList.contains('page-break') || node.getAttribute('data-page-break') === 'true') {
-          checkPageOverflow(pageHeight);
+        // 1. Explicit Page Break
+        if (
+          node.classList.contains('page-break') ||
+          node.getAttribute('data-page-break') === 'true'
+        ) {
+          if (y > marginTop) {
+            advanceToNewPage();
+          }
           continue;
         }
 
-        // Table Element
+        // 2. Standalone Chapter / Section Divider Page (Middle-of-page Centered)
+        if (
+          (tagName === 'h1' || tagName === 'h2' || tagName === 'p') &&
+          isChapterDivider(textContent) &&
+          textContent.length < 40 &&
+          textContent.toUpperCase() !== 'TABLE OF CONTENTS' &&
+          textContent.toUpperCase() !== 'BONAFIDE CERTIFICATE'
+        ) {
+          if (y > marginTop + 10) {
+            advanceToNewPage();
+          }
+
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(15);
+          doc.setTextColor(10, 10, 10);
+          const centerY = pageHeight / 2 - 8;
+          doc.text(textContent.toUpperCase(), pageWidth / 2, centerY, { align: 'center' });
+
+          advanceToNewPage();
+          continue;
+        }
+
+        // 3. Two-Column Signature Line Detection inside Paragraph
+        const twoCol = parseTwoColumnLine(textContent);
+        if (twoCol && (tagName === 'p' || tagName === 'div')) {
+          checkOverflow(26);
+          doc.setFont('Helvetica', textContent.toUpperCase() === textContent ? 'bold' : 'normal');
+          doc.setFontSize(10.5);
+          doc.setTextColor(15, 23, 42);
+
+          // Render Left Side
+          doc.text(twoCol.left, marginLeft, y);
+
+          // Render Right Side
+          doc.text(twoCol.right, pageWidth - marginRight, y, { align: 'right' });
+
+          y += 20;
+          continue;
+        }
+
+        // 4. Tables (Data Table vs Borderless Signature Table)
         if (tagName === 'table') {
+          const isBorderless =
+            node.getAttribute('data-borderless') === 'true' ||
+            style.includes('border: none') ||
+            style.includes('border:none');
+
           const rows = Array.from(node.querySelectorAll('tr'));
           if (rows.length > 0) {
-            checkPageOverflow(40);
-            y += 8;
-
-            const tableRowsData = rows.map((r) =>
+            const tableData = rows.map((r) =>
               Array.from(r.querySelectorAll('th, td')).map((c) => (c.textContent || '').trim())
             );
 
-            const colCount = Math.max(...tableRowsData.map((r) => r.length), 1);
-            const colWidth = contentWidth / colCount;
+            const colCount = Math.max(...tableData.map((r) => r.length), 1);
 
-            tableRowsData.forEach((row, rIdx) => {
-              checkPageOverflow(24);
-              const isHeader = rIdx === 0 && rows[0].querySelector('th') !== null;
-              
-              if (isHeader) {
-                doc.setFillColor(241, 245, 249);
-                doc.rect(margin, y - 10, contentWidth, 22, 'F');
-                doc.setFont('Helvetica', 'bold');
-                doc.setFontSize(9.5);
+            // BORDERLESS SIGNATURE TABLE (e.g. 2-column signature blocks)
+            if (isBorderless && colCount === 2) {
+              tableData.forEach((row) => {
+                checkOverflow(24);
+                const left = row[0] || '';
+                const right = row[1] || '';
+
+                doc.setFont('Helvetica', left.toUpperCase() === left && left.length > 0 ? 'bold' : 'normal');
+                doc.setFontSize(10.5);
                 doc.setTextColor(15, 23, 42);
-              } else {
-                if (rIdx % 2 === 1) {
-                  doc.setFillColor(248, 250, 252);
-                  doc.rect(margin, y - 10, contentWidth, 20, 'F');
-                }
-                doc.setFont('Helvetica', 'normal');
-                doc.setFontSize(9);
-                doc.setTextColor(51, 65, 85);
+
+                doc.text(left, marginLeft, y);
+                doc.text(right, pageWidth - marginRight, y, { align: 'right' });
+                y += 20;
+              });
+              y += 10;
+              continue;
+            }
+
+            // STANDARD BORDERED TABLE / TOC
+            const isTOC =
+              tableData.length > 0 &&
+              tableData[0].some(
+                (h) =>
+                  h.toUpperCase().includes('CONTENTS') ||
+                  h.toUpperCase().includes('S.NO') ||
+                  h.toUpperCase().includes('PAGENO')
+              );
+
+            let colWidths: number[] = [];
+            if (isTOC && colCount === 3) {
+              colWidths = [45, contentWidth - 115, 70];
+            } else {
+              colWidths = Array(colCount).fill(contentWidth / colCount);
+            }
+
+            tableData.forEach((row, rIdx) => {
+              const isHeader = rIdx === 0;
+              const rowHeight = isHeader ? 26 : 22;
+              checkOverflow(rowHeight + 4);
+
+              if (isHeader) {
+                doc.setFillColor(248, 250, 252);
+                doc.rect(marginLeft, y, contentWidth, rowHeight, 'F');
+              } else if (rIdx % 2 === 1) {
+                doc.setFillColor(252, 253, 254);
+                doc.rect(marginLeft, y, contentWidth, rowHeight, 'F');
               }
 
-              // Draw border
               doc.setDrawColor(203, 213, 225);
-              doc.rect(margin, y - 10, contentWidth, isHeader ? 22 : 20, 'S');
+              doc.setLineWidth(0.75);
+              doc.rect(marginLeft, y, contentWidth, rowHeight, 'S');
 
+              let currentX = marginLeft;
               row.forEach((cellText, cIdx) => {
-                const cellX = margin + cIdx * colWidth + 6;
-                const truncated = cellText.length > 30 ? cellText.substring(0, 28) + '...' : cellText;
-                doc.text(truncated, cellX, y + 4);
+                const cellW = colWidths[cIdx] || colWidths[0];
+
+                if (cIdx > 0) {
+                  doc.line(currentX, y, currentX, y + rowHeight);
+                }
+
+                if (isHeader) {
+                  doc.setFont('Helvetica', 'bold');
+                  doc.setFontSize(9.5);
+                  doc.setTextColor(15, 23, 42);
+                  const isCentered = cIdx === 0 || cIdx === 2;
+                  const textX = isCentered ? currentX + cellW / 2 : currentX + 8;
+                  doc.text(cellText, textX, y + 16, { align: isCentered ? 'center' : 'left' });
+                } else {
+                  const isMainChapter = isTOC && cIdx === 1 && /^\d+\s+[A-Z\s]+$/.test(cellText);
+                  const isSubSection = isTOC && cIdx === 1 && /^\d+\.\d+/.test(cellText);
+
+                  doc.setFont('Helvetica', isMainChapter ? 'bold' : 'normal');
+                  doc.setFontSize(isMainChapter ? 9.5 : 9);
+                  doc.setTextColor(isMainChapter ? 10 : 40, isMainChapter ? 10 : 40, isMainChapter ? 10 : 40);
+
+                  const isCentered = cIdx === 0;
+                  const isRight = cIdx === row.length - 1 && isTOC;
+                  const textX = isCentered
+                    ? currentX + cellW / 2
+                    : isRight
+                    ? currentX + cellW - 10
+                    : isSubSection
+                    ? currentX + 16
+                    : currentX + 8;
+
+                  const maxChars = Math.floor(cellW / 6);
+                  const display = cellText.length > maxChars ? cellText.substring(0, maxChars - 3) + '...' : cellText;
+                  doc.text(display, textX, y + 14, {
+                    align: isCentered ? 'center' : isRight ? 'right' : 'left',
+                  });
+                }
+
+                currentX += cellW;
               });
 
-              y += isHeader ? 24 : 20;
+              y += rowHeight;
             });
-            y += 12;
+
+            y += 16;
             continue;
           }
         }
 
-        // Headings (H1, H2, H3, H4)
-        if (tagName === 'h1' || tagName === 'h2' || tagName === 'h3' || tagName === 'h4') {
-          checkPageOverflow(35);
-          y += 6;
+        // 5. Headings & Certificate Titles
+        if (
+          tagName === 'h1' ||
+          tagName === 'h2' ||
+          tagName === 'h3' ||
+          tagName === 'h4' ||
+          isCertificateHeader(textContent)
+        ) {
+          checkOverflow(36);
+          y += 10;
+
+          const isNumberedSection = /^\d+(\.\d+)*\s+/.test(textContent);
+          const isCentered =
+            style.includes('text-align: center') ||
+            alignAttr === 'center' ||
+            isCertificateHeader(textContent) ||
+            textContent.toUpperCase() === 'TABLE OF CONTENTS';
+
           doc.setFont('Helvetica', 'bold');
-          doc.setFontSize(tagName === 'h1' ? 14 : tagName === 'h2' ? 12 : 11);
+          doc.setFontSize(tagName === 'h1' || isCertificateHeader(textContent) ? 13 : 11.5);
           doc.setTextColor(15, 23, 42);
 
-          const headingText = (node.textContent || '').trim();
-          const lines = doc.splitTextToSize(headingText, contentWidth);
-          const textX = align === 'center' ? pageWidth / 2 : align === 'right' ? pageWidth - margin : margin;
+          const lines = doc.splitTextToSize(
+            isNumberedSection ? textContent.toUpperCase() : textContent,
+            contentWidth
+          );
+          const textX = isCentered ? pageWidth / 2 : marginLeft;
 
           lines.forEach((l: string) => {
-            doc.text(l, textX, y, { align: align === 'justify' ? 'left' : align });
-            y += 16;
+            checkOverflow(20);
+            doc.text(l, textX, y, { align: isCentered ? 'center' : 'left' });
+            y += 18;
           });
-          y += 6;
+
+          y += 8;
           continue;
         }
 
-        // Lists (UL, OL)
-        if (tagName === 'ul' || tagName === 'ol') {
-          const items = Array.from(node.querySelectorAll('li'));
-          items.forEach((li, lIdx) => {
-            checkPageOverflow(18);
-            doc.setFont('Helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(30, 41, 59);
-
-            const prefix = tagName === 'ol' ? `${lIdx + 1}. ` : '• ';
-            const liText = prefix + (li.textContent || '').trim();
-            const lines = doc.splitTextToSize(liText, contentWidth - 10);
-
-            lines.forEach((l: string) => {
-              doc.text(l, margin + 10, y);
-              y += 14;
-            });
-          });
-          y += 6;
-          continue;
-        }
-
-        // Image Element (Embedded DOCX / HTML Images)
+        // 6. Embedded Images / Screenshots
         const imgElement = tagName === 'img' ? (node as HTMLImageElement) : node.querySelector('img');
         if (imgElement) {
           const src = imgElement.getAttribute('src') || '';
           if (src && (src.startsWith('data:image/') || src.startsWith('blob:') || src.startsWith('http'))) {
             try {
-              checkPageOverflow(160);
+              checkOverflow(200);
               const imgFormat = src.includes('image/png') || src.includes('.png') ? 'PNG' : 'JPEG';
-              const maxImgWidth = Math.min(contentWidth, 360);
-              const imgHeight = 180;
-              const imgX = align === 'center' ? (pageWidth - maxImgWidth) / 2 : align === 'right' ? pageWidth - margin - maxImgWidth : margin;
+              const maxImgWidth = Math.min(contentWidth, 440);
+              const imgHeight = 210;
+              const imgX = (pageWidth - maxImgWidth) / 2;
+
+              doc.setDrawColor(226, 232, 240);
+              doc.rect(imgX - 2, y - 2, maxImgWidth + 4, imgHeight + 4, 'S');
 
               doc.addImage(src, imgFormat, imgX, y, maxImgWidth, imgHeight);
-              y += imgHeight + 14;
+              y += imgHeight + 18;
               continue;
             } catch (imgErr) {
-              console.warn('Non-fatal error adding image to PDF:', imgErr);
+              console.warn('Image rendering fallback:', imgErr);
             }
           }
         }
 
-        // Paragraphs & generic blocks
-        const pText = (node.textContent || '').trim();
-        if (pText) {
-          checkPageOverflow(20);
-          doc.setFont('Helvetica', 'normal');
-          doc.setFontSize(10);
+        // 7. Lists (UL, OL) & Key-Value Bullet Points
+        if (tagName === 'ul' || tagName === 'ol') {
+          const items = Array.from(node.querySelectorAll('li'));
+          items.forEach((li, lIdx) => {
+            checkOverflow(20);
+            const rawLi = (li.textContent || '').trim();
+
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(10.5);
+            doc.setTextColor(30, 41, 59);
+
+            if (rawLi.includes(' : ') || rawLi.includes(' - ')) {
+              const delimiter = rawLi.includes(' : ') ? ' : ' : ' - ';
+              const [key, ...rest] = rawLi.split(delimiter);
+              const val = rest.join(delimiter).trim();
+
+              doc.setFont('Helvetica', 'bold');
+              doc.text(`•  ${key.trim()} :`, marginLeft + 8, y);
+
+              doc.setFont('Helvetica', 'normal');
+              doc.text(val, marginLeft + 180, y);
+              y += 18;
+            } else {
+              const prefix = tagName === 'ol' ? `${lIdx + 1}. ` : '•  ';
+              const fullText = prefix + rawLi;
+              const lines = doc.splitTextToSize(fullText, contentWidth - 16);
+
+              lines.forEach((l: string, idx: number) => {
+                checkOverflow(18);
+                doc.text(l, marginLeft + (idx === 0 ? 8 : 20), y);
+                y += 16.5;
+              });
+              y += 3;
+            }
+          });
+
+          y += 6;
+          continue;
+        }
+
+        // 8. Source Code Block (Pre, Code, or Sample Coding block)
+        if (
+          tagName === 'pre' ||
+          tagName === 'code' ||
+          textContent.startsWith('<?php') ||
+          textContent.startsWith('<!DOCTYPE') ||
+          textContent.includes('session_start()') ||
+          textContent.includes('mysql_query')
+        ) {
+          const codeLines = textContent.split(/\r\n|\n/);
+          doc.setFont('Courier', 'normal');
+          doc.setFontSize(9);
           doc.setTextColor(30, 41, 59);
 
-          const lines = doc.splitTextToSize(pText, contentWidth);
-          const textX = align === 'center' ? pageWidth / 2 : align === 'right' ? pageWidth - margin : margin;
-
-          lines.forEach((line: string) => {
-            checkPageOverflow(16);
-            doc.text(line, textX, y, { align: align === 'justify' ? 'left' : align });
+          codeLines.forEach((cLine) => {
+            checkOverflow(15);
+            doc.text(cLine, marginLeft + 8, y);
             y += 14;
           });
-          y += 6;
+
+          y += 8;
+          continue;
+        }
+
+        // 9. Regular Paragraphs & Sub-sections
+        if (textContent) {
+          const isSubHeading =
+            textContent.length < 50 &&
+            !textContent.endsWith('.') &&
+            (textContent === 'Abstract' ||
+              textContent === 'Existing System' ||
+              textContent === 'Disadvantages' ||
+              textContent === 'Proposed System' ||
+              textContent === 'Advantages' ||
+              textContent === 'Modules' ||
+              textContent === 'Modules Description' ||
+              textContent === 'Customer Registration' ||
+              textContent === 'Manage event & Food Items' ||
+              textContent === 'Ordering Food' ||
+              textContent === 'Confirm Purchase' ||
+              textContent === 'Bill Generation' ||
+              textContent === 'Open Source' ||
+              textContent === 'Cross-Platform' ||
+              textContent === 'Power' ||
+              textContent === 'User Friendly' ||
+              textContent === 'Quick' ||
+              textContent === 'Extensions' ||
+              textContent === 'Easy Deployment' ||
+              textContent === 'Automatically Refreshes' ||
+              textContent === 'Community Support' ||
+              textContent === 'Other Tools' ||
+              textContent === 'Security' ||
+              textContent === 'Talent Availability' ||
+              textContent === 'OUTPUT DESIGN');
+
+          if (isSubHeading) {
+            checkOverflow(28);
+            y += 8;
+            doc.setFont('Helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(15, 23, 42);
+            doc.text(textContent, marginLeft, y);
+            y += 18;
+            continue;
+          }
+
+          checkOverflow(22);
+          doc.setFont('Helvetica', 'normal');
+          doc.setFontSize(10.5);
+          doc.setTextColor(30, 41, 59);
+
+          const lines = doc.splitTextToSize(textContent, contentWidth);
+          const isCentered = style.includes('text-align: center') || alignAttr === 'center';
+          const textX = isCentered ? pageWidth / 2 : marginLeft;
+
+          lines.forEach((line: string) => {
+            checkOverflow(18);
+            doc.text(line, textX, y, { align: isCentered ? 'center' : 'left' });
+            y += 17;
+          });
+
+          y += 10;
         }
       }
 
-      // Footer on final page
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 25, { align: 'center' });
+      drawPageNumber(pageNumber);
 
       if (options.watermarkText) {
         applyWatermark(doc, options.watermarkText, pageWidth, pageHeight, pageNumber);
@@ -690,11 +962,13 @@ function generateFormattedDocumentPDF(
         fileName: `${baseName}.pdf`,
       };
     } catch (parseErr) {
-      console.warn('Rich HTML to PDF fallback to raw paragraphs:', parseErr);
+      console.warn('HTML document parser exception, falling back to clean text engine:', parseErr);
     }
   }
 
-  // Fallback: Split raw text into paragraphs
+  // -------------------------------------------------------------
+  // 2. RAW TEXT / CLEAN PARAGRAPHS FALLBACK ENGINE
+  // -------------------------------------------------------------
   const paragraphs = rawText
     .split(/\r\n\r\n|\n\n/)
     .map((p) => p.trim())
@@ -703,51 +977,72 @@ function generateFormattedDocumentPDF(
   const cleanParagraphs = paragraphs.length > 0 ? paragraphs : ['(Empty document content)'];
 
   cleanParagraphs.forEach((para) => {
-    // Check if heading
+    // 1. Check for standalone chapter divider
+    if (isChapterDivider(para) && para.length < 40 && para.toUpperCase() !== 'TABLE OF CONTENTS' && para.toUpperCase() !== 'BONAFIDE CERTIFICATE') {
+      if (y > marginTop + 10) {
+        advanceToNewPage();
+      }
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.setTextColor(10, 10, 10);
+      doc.text(para.toUpperCase(), pageWidth / 2, pageHeight / 2 - 8, { align: 'center' });
+      advanceToNewPage();
+      return;
+    }
+
+    // 2. Check for two-column signature block
+    const twoCol = parseTwoColumnLine(para);
+    if (twoCol) {
+      checkOverflow(26);
+      doc.setFont('Helvetica', para.toUpperCase() === para ? 'bold' : 'normal');
+      doc.setFontSize(10.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text(twoCol.left, marginLeft, y);
+      doc.text(twoCol.right, pageWidth - marginRight, y, { align: 'right' });
+      y += 20;
+      return;
+    }
+
+    // 3. Check for Section Heading or Certificate Title
     const isHeading =
-      para.length < 75 &&
+      para.length < 70 &&
       (para.startsWith('#') ||
-        para.startsWith('Chapter') ||
-        para.startsWith('Section') ||
-        /^[A-Z0-9\s:.-]+$/.test(para));
+        isCertificateHeader(para) ||
+        /^\d+(\.\d+)*\s+[A-Za-z0-9]/.test(para) ||
+        para.toUpperCase() === 'TABLE OF CONTENTS' ||
+        /^[A-Z0-9\s:.-]{4,40}$/.test(para));
 
     if (isHeading) {
-      checkPageOverflow(30);
+      checkOverflow(32);
       y += 8;
       doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(13);
+      doc.setFontSize(12.5);
       doc.setTextColor(15, 23, 42);
 
       const cleanHeading = para.replace(/^#+\s*/, '');
-      const headingLines = doc.splitTextToSize(cleanHeading, contentWidth);
-      doc.text(headingLines, margin, y);
-      y += headingLines.length * 16 + 8;
+      const isCentered = isCertificateHeader(cleanHeading) || cleanHeading.toUpperCase() === 'TABLE OF CONTENTS';
+      const textX = isCentered ? pageWidth / 2 : marginLeft;
+
+      doc.text(cleanHeading, textX, y, { align: isCentered ? 'center' : 'left' });
+      y += 20;
     } else {
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(10.5);
       doc.setTextColor(30, 41, 59);
 
-      const isCentered = para.startsWith('[center]');
-      const cleanPara = para.replace(/^\[center\]/i, '').trim();
-      const lines = doc.splitTextToSize(cleanPara, contentWidth);
-      const textX = isCentered ? pageWidth / 2 : margin;
-
+      const lines = doc.splitTextToSize(para, contentWidth);
       lines.forEach((line: string) => {
-        checkPageOverflow(18);
-        doc.text(line, textX, y, { align: isCentered ? 'center' : 'left' });
-        y += 15;
+        checkOverflow(18);
+        doc.text(line, marginLeft, y);
+        y += 17;
       });
 
-      y += 8;
+      y += 10;
     }
   });
 
-  // Footer on final page
-  doc.setFontSize(8);
-  doc.setTextColor(148, 163, 184);
-  doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 25, { align: 'center' });
+  drawPageNumber(pageNumber);
 
-  // Optional Watermark
   if (options.watermarkText) {
     applyWatermark(doc, options.watermarkText, pageWidth, pageHeight, pageNumber);
   }
@@ -764,7 +1059,6 @@ function generateFormattedDocumentPDF(
     fileName: `${baseName}.pdf`,
   };
 }
-
 
 /**
  * Generates an Image PDF with correct aspect ratio
@@ -789,9 +1083,9 @@ async function generateImagePDF(
 
   const isLandscape = img.width > img.height;
   const doc = new jsPDF(isLandscape ? 'l' : 'p', 'pt', 'a4');
-  const pageWidth = isLandscape ? 842 : 595;
-  const pageHeight = isLandscape ? 595 : 842;
-  const margin = 40;
+  const pageWidth = isLandscape ? 842 : 595.3;
+  const pageHeight = isLandscape ? 595.3 : 841.9;
+  const margin = 50;
 
   const maxWidth = pageWidth - margin * 2;
   const maxHeight = pageHeight - margin * 2;
@@ -806,7 +1100,14 @@ async function generateImagePDF(
   const x = (pageWidth - renderWidth) / 2;
   const y = (pageHeight - renderHeight) / 2;
 
+  doc.setDrawColor(226, 232, 240);
+  doc.rect(x - 1, y - 1, renderWidth + 2, renderHeight + 2, 'S');
+
   doc.addImage(dataUrl, 'JPEG', x, y, renderWidth, renderHeight);
+
+  doc.setFontSize(9);
+  doc.setTextColor(30, 30, 30);
+  doc.text('1', pageWidth / 2, pageHeight - 35, { align: 'center' });
 
   if (options.watermarkText) {
     applyWatermark(doc, options.watermarkText, pageWidth, pageHeight, 1);
@@ -837,9 +1138,9 @@ function applyWatermark(
 ) {
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    doc.setFontSize(48);
+    doc.setFontSize(44);
     doc.setTextColor(220, 38, 38);
-    doc.setGState(new (doc as any).GState({ opacity: 0.18 }));
+    doc.setGState(new (doc as any).GState({ opacity: 0.16 }));
     doc.text(watermarkText, pageWidth / 2, pageHeight / 2, {
       align: 'center',
       angle: 45,
@@ -853,7 +1154,7 @@ function applyWatermark(
  */
 export const createConvertedPDFBlob = (
   fileName: string,
-  sourceFormat: string,
+  _sourceFormat: string,
   rawContent?: string
 ): { blob: Blob; url: string } => {
   const result = generateFormattedDocumentPDF(
