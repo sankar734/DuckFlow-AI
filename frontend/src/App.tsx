@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AppRoutes } from './routes/AppRoutes';
 import { useThemeStore } from './store/themeStore';
+import { useCreditStore, startCreditTimer } from './store/creditStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,9 +17,12 @@ const queryClient = new QueryClient({
 
 export const App: React.FC = () => {
   const { theme, setTheme } = useThemeStore();
+  const { fetchCredits } = useCreditStore();
 
   useEffect(() => {
     setTheme(theme);
+    fetchCredits();
+    startCreditTimer();
   }, [theme, setTheme]);
 
   return (

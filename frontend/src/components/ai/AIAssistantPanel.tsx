@@ -10,8 +10,11 @@ import {
   ChevronDown,
   Copy,
   Plus,
+  Zap,
+  Clock,
 } from 'lucide-react';
 import { aiService } from '../../services/aiService';
+import { useCreditStore, formatTimeRemaining } from '../../store/creditStore';
 import { Button } from '../common/Button';
 import { toast } from 'sonner';
 
@@ -27,6 +30,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   currentDocumentContent,
 }) => {
   const insertHandler = onInsertContent || onInsertText;
+  const { availableCredits, refillSecondsRemaining } = useCreditStore();
   const [prompt, setPrompt] = useState('');
   const [selectedAction, setSelectedAction] = useState('rewrite');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +46,11 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   ];
 
   const handleExecuteAI = async (action: string = selectedAction, lang?: string) => {
+    if (availableCredits < 1) {
+      toast.error(`Out of AI credits for today! Your daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const textToProcess = prompt || currentDocumentContent || 'Executive overview of project milestones and deliverables.';
@@ -72,12 +81,32 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
             <p className="text-[10px] text-slate-400">Context-Aware Document Copilot</p>
           </div>
         </div>
+
+        {/* Live Credit Chip */}
+        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-[10px] font-bold text-purple-700 dark:text-purple-300">
+          <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+          <span>{availableCredits}⚡</span>
+        </div>
       </div>
+
+      {/* Out of credits warning if applicable */}
+      {availableCredits < 1 && (
+        <div className="my-2 p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+          <div>
+            <span className="font-bold">Daily Credits Exhausted</span>
+            <div className="text-[10px] text-amber-600 dark:text-amber-400">
+              Refills in {formatTimeRemaining(refillSecondsRemaining)}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions Scrollable Chips */}
       <div className="my-3">
-        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-          Suggested Actions
+        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+          <span>Suggested Actions</span>
+          <span className="text-[9px] text-purple-500 normal-case font-medium">1 credit each</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {quickPrompts.map((q, i) => (
@@ -87,9 +116,10 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
                 setSelectedAction(q.action);
                 handleExecuteAI(q.action, q.lang);
               }}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-colors flex items-center gap-1"
             >
-              {q.label}
+              <span>{q.label}</span>
+              <span className="text-[9px] text-purple-500 font-bold">1⚡</span>
             </button>
           ))}
         </div>

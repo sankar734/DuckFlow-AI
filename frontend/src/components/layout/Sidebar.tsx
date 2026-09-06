@@ -21,9 +21,11 @@ import {
   Layers,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useCreditStore, formatTimeRemaining } from '../../store/creditStore';
 
 export const Sidebar: React.FC = () => {
   const { user } = useAuthStore();
+  const { availableCredits, totalCredits, refillSecondsRemaining } = useCreditStore();
 
   const mainNav = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -156,27 +158,28 @@ export const Sidebar: React.FC = () => {
       {/* AI Credit Mini-Widget */}
       <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800/80 space-y-3">
 
-        {/* AI Credits Meter */}
+        {/* AI Credits Meter (Canva Style) */}
         <Link
           to="/billing"
-          className="group block p-3 rounded-xl bg-gradient-to-r from-purple-500/10 to-brand-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all"
+          className="group block p-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-brand-500/10 to-indigo-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all"
         >
           <div className="flex items-center justify-between text-[11px] font-semibold text-purple-700 dark:text-purple-300 mb-1.5">
             <span className="flex items-center gap-1">
-              <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" /> AI Credits
+              <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 animate-pulse" /> AI Magic Credits
             </span>
             <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400 flex items-center group-hover:translate-x-0.5 transition-transform">
               Upgrade <ChevronRight className="w-3 h-3 ml-0.5" />
             </span>
           </div>
-          <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mb-1">
+          <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mb-1.5">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-purple-500 to-amber-500 transition-all duration-500"
-              style={{ width: `${aiPercent}%` }}
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-brand-500 to-purple-600 transition-all duration-500"
+              style={{ width: `${Math.max(5, Math.min(100, Math.round((availableCredits / (totalCredits || 1)) * 100)))}%` }}
             />
           </div>
-          <div className="text-[10px] text-slate-500 dark:text-slate-400">
-            {user?.aiCredits ? user.aiCredits - user.aiCreditsUsed : 435} credits remaining
+          <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-slate-800 dark:text-slate-200">{availableCredits} / {totalCredits}</span>
+            <span className="text-purple-600 dark:text-purple-400 font-mono">Refills: {formatTimeRemaining(refillSecondsRemaining)}</span>
           </div>
         </Link>
       </div>

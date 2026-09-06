@@ -10,13 +10,79 @@ export class AIService {
     return getAIProvider();
   }
 
-  private async deductCredits(userId: string, credits: number, operation: any, promptSnippet?: string, documentId?: string) {
+  /**
+   * Evaluates if a daily cycle (24 hours or new calendar day) has elapsed since last refill.
+   * If yes, automatically resets daily credit usage or restores full daily capacity.
+   */
+  async checkAndApplyDailyRefill(user: any): Promise<{
+    refilled: boolean;
+    nextRefillAt: Date;
+    refillSecondsRemaining: number;
+    dailyAllocation: number;
+  }> {
+    const now = new Date();
+    const lastRefill = user.lastCreditRefillAt ? new Date(user.lastCreditRefillAt) : new Date(user.createdAt || now);
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+    const elapsedMs = now.getTime() - lastRefill.getTime();
+    const isNewCalendarDay =
+      now.getUTCDate() !== lastRefill.getUTCDate() ||
+      now.getUTCMonth() !== lastRefill.getUTCMonth() ||
+      now.getUTCFullYear() !== lastRefill.getUTCFullYear();
+
+    let refilled = false;
+    const dailyAllocation =
+      user.dailyCreditsAllocation ||
+      (user.planId === 'pro' ? 250 : user.planId === 'business' ? 1000 : 50);
+
+    if (elapsedMs >= ONE_DAY_MS || (elapsedMs > 60 * 1000 && isNewCalendarDay)) {
+      user.aiCredits = Math.max(user.aiCredits || 0, dailyAllocation);
+      user.aiCreditsUsed = 0; // Reset usage for new day
+      user.lastCreditRefillAt = now;
+      user.dailyCreditsAllocation = dailyAllocation;
+      await user.save();
+      refilled = true;
+
+      try {
+        await ActivityLog.create({
+          userId: user._id,
+          action: 'AI_DAILY_REFILL',
+          resourceType: 'AIUsage',
+          metadata: { dailyAllocation, message: 'Daily AI credits replenished' },
+        });
+      } catch {
+        // non-blocking
+      }
+    }
+
+    const currentRefill = user.lastCreditRefillAt ? new Date(user.lastCreditRefillAt) : now;
+    const nextRefillAt = new Date(currentRefill.getTime() + ONE_DAY_MS);
+    const refillSecondsRemaining = Math.max(0, Math.floor((nextRefillAt.getTime() - now.getTime()) / 1000));
+
+    return { refilled, nextRefillAt, refillSecondsRemaining, dailyAllocation };
+  }
+
+  private async deductCredits(
+    userId: string,
+    credits: number,
+    operation: any,
+    promptSnippet?: string,
+    documentId?: string
+  ) {
     const user = await User.findById(userId);
     if (!user) throw new AppError('User not found', 404);
 
+    const { nextRefillAt, refillSecondsRemaining, dailyAllocation } =
+      await this.checkAndApplyDailyRefill(user);
+
     const available = user.aiCredits - user.aiCreditsUsed;
     if (available < credits) {
-      throw new AppError(`Insufficient AI credits. Required: ${credits}, Remaining: ${available}`, 402, 'AI_CREDITS_EXHAUSTED');
+      const hoursLeft = Math.max(1, Math.ceil(refillSecondsRemaining / 3600));
+      throw new AppError(
+        `Insufficient AI credits. Required: ${credits}, Remaining: ${available}. Your daily allowance (+${dailyAllocation} credits) will refill in ${hoursLeft}h.`,
+        402,
+        'AI_CREDITS_EXHAUSTED'
+      );
     }
 
     user.aiCreditsUsed += credits;
@@ -37,6 +103,16 @@ export class AIService {
       resourceType: 'AIUsage',
       metadata: { operation, creditsUsed: credits },
     });
+
+    return {
+      creditsDeducted: credits,
+      availableCredits: Math.max(0, user.aiCredits - user.aiCreditsUsed),
+      totalCredits: user.aiCredits,
+      usedCredits: user.aiCreditsUsed,
+      nextRefillAt,
+      refillSecondsRemaining,
+      dailyAllocation,
+    };
   }
 
   async generateDocument(userId: string, data: {
@@ -48,7 +124,7 @@ export class AIService {
     format?: string;
   }) {
     const creditsRequired = data.length === 'Long' ? 3 : 2;
-    await this.deductCredits(userId, creditsRequired, 'DOCUMENT_WIZARD', data.prompt);
+    const creditInfo = await this.deductCredits(userId, creditsRequired, 'DOCUMENT_WIZARD', data.prompt);
 
     const provider = this.getProvider();
     const generatedText = await provider.generateText({
@@ -60,7 +136,7 @@ export class AIService {
       title: `${data.documentType}: ${data.prompt.slice(0, 30)}...`,
       content: generatedText,
       documentType: data.documentType,
-      creditsDeducted: creditsRequired,
+      ...creditInfo,
     };
   }
 
@@ -70,36 +146,36 @@ export class AIService {
     targetLanguage?: string;
     instructions?: string;
   }) {
-    await this.deductCredits(userId, 1, 'WRITER', data.content.slice(0, 60));
+    const creditInfo = await this.deductCredits(userId, 1, 'WRITER', data.content.slice(0, 60));
     const provider = this.getProvider();
     const result = await provider.rewriteText(data.content, data.action, 'Professional', data.targetLanguage);
-    return { result, creditsDeducted: 1 };
+    return { result, ...creditInfo };
   }
 
   async summarize(userId: string, data: { text: string; length?: 'short' | 'medium' | 'detailed' }) {
-    await this.deductCredits(userId, 1, 'SUMMARIZE', data.text.slice(0, 60));
+    const creditInfo = await this.deductCredits(userId, 1, 'SUMMARIZE', data.text.slice(0, 60));
     const provider = this.getProvider();
     const summary = await provider.summarizeText(data.text, data.length || 'medium');
-    return { summary, creditsDeducted: 1 };
+    return { summary, ...creditInfo };
   }
 
   async chatWithPdf(userId: string, data: { prompt: string; pdfContext?: string; documentId?: string }) {
-    await this.deductCredits(userId, 1, 'PDF_CHAT', data.prompt, data.documentId);
+    const creditInfo = await this.deductCredits(userId, 1, 'PDF_CHAT', data.prompt, data.documentId);
     const provider = this.getProvider();
     const response = await provider.answerPdfQuestion(data.pdfContext || '', data.prompt);
-    return { ...response, creditsDeducted: 1 };
+    return { ...response, ...creditInfo };
   }
 
   async analyzeExcel(userId: string, data: { data?: any; prompt?: string; action?: string }) {
-    await this.deductCredits(userId, 1, 'EXCEL_ANALYST', data.prompt);
+    const creditInfo = await this.deductCredits(userId, 2, 'EXCEL_ANALYST', data.prompt);
     const provider = this.getProvider();
     const analysis = await provider.analyzeSpreadsheet(data.data, data.action || 'analyze', data.prompt);
-    return { analysis, creditsDeducted: 1 };
+    return { analysis, ...creditInfo };
   }
 
   async generatePresentation(userId: string, data: { topic: string; slideCount?: number; audience?: string; tone?: string }) {
     const creditsRequired = 3;
-    await this.deductCredits(userId, creditsRequired, 'PRESENTATION_GEN', data.topic);
+    const creditInfo = await this.deductCredits(userId, creditsRequired, 'PRESENTATION_GEN', data.topic);
     const provider = this.getProvider();
     const presentation = await provider.generatePresentationOutline(
       data.topic,
@@ -107,7 +183,7 @@ export class AIService {
       data.audience || 'General Business',
       data.tone || 'Professional'
     );
-    return { presentation, creditsDeducted: creditsRequired };
+    return { presentation, ...creditInfo };
   }
 
   async createArtifact(userId: string, data: {
@@ -133,7 +209,7 @@ export class AIService {
     }
 
     const creditsRequired = detectedFormat === 'PPT' || detectedFormat === 'EXCEL' ? 3 : 2;
-    await this.deductCredits(userId, creditsRequired, 'DOCUMENT_WIZARD', data.prompt);
+    const creditInfo = await this.deductCredits(userId, creditsRequired, 'DOCUMENT_WIZARD', data.prompt);
     const provider = this.getProvider();
 
     if (detectedFormat === 'PPT') {
@@ -167,7 +243,7 @@ export class AIService {
         slides,
         theme,
         totalSlides: slides.length,
-        creditsDeducted: creditsRequired,
+        ...creditInfo,
       };
     }
 
@@ -192,7 +268,7 @@ export class AIService {
         headers: defaultHeaders,
         gridData: defaultRows,
         summary: generatedSpreadsheet?.summary || 'Synthesized financial spreadsheet with automated formulas.',
-        creditsDeducted: creditsRequired,
+        ...creditInfo,
       };
     }
 
@@ -224,7 +300,7 @@ Format strictly in clean, semantic HTML with <h2>, <h3>, <p>, <ul>, <li>, <table
       artifactType: detectedFormat === 'PDF' ? 'PDF' : 'WORD',
       title: `${data.prompt.slice(0, 35)}.docx`,
       contentHtml: cleanHtml || `<h2>${data.prompt}</h2><p>Comprehensive report synthesized by DocuFlow AI.</p>`,
-      creditsDeducted: creditsRequired,
+      ...creditInfo,
     };
   }
 
@@ -232,12 +308,31 @@ Format strictly in clean, semantic HTML with <h2>, <h3>, <p>, <ul>, <li>, <table
     const user = await User.findById(userId);
     if (!user) throw new AppError('User not found', 404);
 
+    const { nextRefillAt, refillSecondsRemaining, dailyAllocation } =
+      await this.checkAndApplyDailyRefill(user);
+
     const history = await AIUsage.find({ userId }).sort({ createdAt: -1 }).limit(15);
+    const availableCredits = Math.max(0, user.aiCredits - user.aiCreditsUsed);
+
+    const costMatrix = [
+      { tool: 'AI Writer / Tone', cost: 1, category: 'Text', description: 'Rewriting, expanding, tone shift' },
+      { tool: 'PDF Context QA', cost: 1, category: 'Document', description: 'Ask questions from uploaded documents' },
+      { tool: 'Document Summary', cost: 1, category: 'Text', description: 'Instant executive summaries' },
+      { tool: 'Excel AI Analyst', cost: 2, category: 'Spreadsheet', description: 'Automated formulas and data analysis' },
+      { tool: 'Document Synthesis', cost: 2, category: 'Synthesis', description: 'Word report drafting & formatting' },
+      { tool: 'Presentation Gen', cost: 3, category: 'Slides', description: 'Multi-slide presentation outline' },
+    ];
+
     return {
       totalCredits: user.aiCredits,
       usedCredits: user.aiCreditsUsed,
-      availableCredits: Math.max(0, user.aiCredits - user.aiCreditsUsed),
+      availableCredits,
       planId: user.planId,
+      dailyAllocation,
+      lastRefillAt: user.lastCreditRefillAt,
+      nextRefillAt,
+      refillSecondsRemaining,
+      costMatrix,
       history,
     };
   }

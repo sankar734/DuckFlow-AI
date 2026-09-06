@@ -14,6 +14,8 @@ export interface User {
   storageLimit: number;
   aiCredits: number;
   aiCreditsUsed: number;
+  lastCreditRefillAt?: string;
+  dailyCreditsAllocation?: number;
   preferences: {
     theme: 'light' | 'dark' | 'system';
     language: string;

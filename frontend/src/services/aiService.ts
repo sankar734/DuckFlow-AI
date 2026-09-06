@@ -1,4 +1,5 @@
 import { api } from './api';
+import { useCreditStore } from '../store/creditStore';
 
 export const aiService = {
   generateDocument: async (payload: {
@@ -11,8 +12,11 @@ export const aiService = {
   }) => {
     try {
       const res = await api.post('/ai/documents/generate', payload);
-      return (res as any).data;
+      const data = (res as any).data || res;
+      useCreditStore.getState().syncFromAIResponse(data, 'Document Synthesis');
+      return data;
     } catch {
+      useCreditStore.getState().consumeCredits(2, 'Document Synthesis');
       return {
         title: `${payload.documentType}: ${payload.prompt.slice(0, 30)}...`,
         content: `## ${payload.documentType} Document\n\n### Executive Summary\nGenerated specifically for "${payload.prompt}" with a ${payload.tone || 'Professional'} tone.\n\n### Core Insights & Architecture\n1. **High Efficiency**: Automated workflows reduce manual drafting time by 80%.\n2. **Seamless Formatting**: Standardized typography, structured headings, and crisp visual hierarchy.\n\n### Actionable Deliverables\n- Finalize stakeholder alignment.\n- Distribute via secure DocuFlow team links.`,
@@ -25,8 +29,11 @@ export const aiService = {
   aiWriter: async (payload: { action: string; content: string; targetLanguage?: string }) => {
     try {
       const res = await api.post('/ai/writer', payload);
-      return (res as any).data;
+      const data = (res as any).data || res;
+      useCreditStore.getState().syncFromAIResponse(data, 'AI Writer');
+      return data;
     } catch {
+      useCreditStore.getState().consumeCredits(1, 'AI Writer');
       return {
         result: `Optimized & Enhanced (${payload.action}):\n"${payload.content}"\n\n[DocuFlow AI refined this text for maximum clarity, punchy phrasing, and professional presentation.]`,
         creditsDeducted: 1,
@@ -37,8 +44,11 @@ export const aiService = {
   chatPdf: async (payload: { prompt: string; pdfContext?: string }) => {
     try {
       const res = await api.post('/ai/pdf/chat', payload);
-      return (res as any).data;
+      const data = (res as any).data || res;
+      useCreditStore.getState().syncFromAIResponse(data, 'PDF Context QA');
+      return data;
     } catch {
+      useCreditStore.getState().consumeCredits(1, 'PDF Context QA');
       return {
         answer: `According to the uploaded document, "${payload.prompt}" is covered under Section 3.1. The analysis confirms full compliance with ISO standards and verifies zero unencrypted data transmission.`,
         references: ['Page 2, Section 3.1: Compliance Matrix', 'Page 4, Table 1.2: Audit Verifications'],
@@ -50,8 +60,11 @@ export const aiService = {
   analyzeExcel: async (payload: { data?: any; prompt?: string; action?: string }) => {
     try {
       const res = await api.post('/ai/excel/analyze', payload);
-      return (res as any).data;
+      const data = (res as any).data || res;
+      useCreditStore.getState().syncFromAIResponse(data, 'Excel AI Analyst');
+      return data;
     } catch {
+      useCreditStore.getState().consumeCredits(2, 'Excel AI Analyst');
       return {
         analysis: {
           summary: 'Analysis completed successfully. Identified positive upward revenue trajectory across all tracked quarters.',
@@ -70,7 +83,7 @@ export const aiService = {
             title: 'Revenue vs Server Overhead by Quarter',
           },
         },
-        creditsDeducted: 1,
+        creditsDeducted: 2,
       };
     }
   },
@@ -78,8 +91,11 @@ export const aiService = {
   generatePresentation: async (payload: { topic: string; slideCount?: number; audience?: string; tone?: string }) => {
     try {
       const res = await api.post('/ai/presentation/generate', payload);
-      return (res as any).data;
+      const data = (res as any).data || res;
+      useCreditStore.getState().syncFromAIResponse(data, 'Presentation Gen');
+      return data;
     } catch {
+      useCreditStore.getState().consumeCredits(3, 'Presentation Gen');
       return {
         presentation: {
           topic: payload.topic,
@@ -123,10 +139,13 @@ export const aiService = {
   }) => {
     try {
       const res = await api.post('/ai/artifact', payload);
-      return (res as any).data;
+      const data = (res as any).data || res;
+      useCreditStore.getState().syncFromAIResponse(data, 'Document Synthesis');
+      return data;
     } catch {
       const p = payload.prompt.toLowerCase();
       if (payload.preferredFormat === 'PPT' || p.includes('presentation') || p.includes('ppt') || p.includes('slide')) {
+        useCreditStore.getState().consumeCredits(3, 'Presentation Gen');
         return {
           artifactType: 'PPT',
           title: `${payload.prompt.slice(0, 30)}.pptx`,
@@ -164,6 +183,7 @@ export const aiService = {
           creditsDeducted: 3,
         };
       } else if (payload.preferredFormat === 'EXCEL' || p.includes('sheet') || p.includes('excel') || p.includes('budget') || p.includes('tracker')) {
+        useCreditStore.getState().consumeCredits(2, 'Excel AI Analyst');
         return {
           artifactType: 'EXCEL',
           title: `${payload.prompt.slice(0, 30)}.xlsx`,
@@ -175,9 +195,10 @@ export const aiService = {
             ['Professional Services', '32000', '41000', '53000', '71000', '=SUM(B5:E5)', '+11.8%'],
           ],
           summary: 'Generated interactive spreadsheet model with automated summation formulas.',
-          creditsDeducted: 3,
+          creditsDeducted: 2,
         };
       } else {
+        useCreditStore.getState().consumeCredits(2, 'Document Synthesis');
         return {
           artifactType: 'WORD',
           title: `${payload.prompt.slice(0, 30)}.docx`,
@@ -191,19 +212,24 @@ export const aiService = {
   getCredits: async () => {
     try {
       const res = await api.get('/ai/credits');
-      return (res as any).data;
+      const data = (res as any).data || res;
+      useCreditStore.getState().syncFromAIResponse(data);
+      return data;
     } catch {
+      await useCreditStore.getState().fetchCredits();
+      const state = useCreditStore.getState();
       return {
-        totalCredits: 500,
-        usedCredits: 65,
-        availableCredits: 435,
+        totalCredits: state.totalCredits,
+        usedCredits: state.usedCredits,
+        availableCredits: state.availableCredits,
+        dailyAllocation: state.dailyAllocation,
+        nextRefillAt: state.nextRefillAt,
+        refillSecondsRemaining: state.refillSecondsRemaining,
         planId: 'pro',
-        history: [
-          { _id: 'h1', operation: 'AI Writer', creditsUsed: 1, promptSnippet: 'Refine executive summary', createdAt: new Date().toISOString() },
-          { _id: 'h2', operation: 'PDF Chat', creditsUsed: 1, promptSnippet: 'Summarize Section 2', createdAt: new Date().toISOString() },
-          { _id: 'h3', operation: 'Presentation Gen', creditsUsed: 3, promptSnippet: 'AI Startup Pitch Deck', createdAt: new Date().toISOString() },
-        ],
+        costMatrix: state.costMatrix,
+        history: state.history,
       };
     }
   },
 };
+

@@ -26,6 +26,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { aiService } from '../../services/aiService';
+import { useCreditStore, formatTimeRemaining } from '../../store/creditStore';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import {
@@ -41,6 +42,7 @@ import { toast } from 'sonner';
 export const AIStudioPage: React.FC = () => {
   const navigate = useNavigate();
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const { availableCredits, totalCredits, dailyAllocation, refillSecondsRemaining } = useCreditStore();
   const [activeTab, setActiveTab] = useState<'wizard' | 'writer' | 'pdf_chat' | 'presentation' | 'cloud'>('wizard');
 
   // Cloud State
@@ -96,6 +98,11 @@ export const AIStudioPage: React.FC = () => {
   const handleRunWizard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!wizardPrompt.trim()) return;
+    const required = length === 'Long' ? 3 : 2;
+    if (availableCredits < required) {
+      toast.error(`Insufficient AI credits! You need ${required} credits (Have: ${availableCredits}). Daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
+      return;
+    }
     setIsGenerating(true);
     try {
       const res = await aiService.generateDocument({
@@ -117,6 +124,10 @@ export const AIStudioPage: React.FC = () => {
   const handleSendPdfChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pdfQuestion.trim()) return;
+    if (availableCredits < 1) {
+      toast.error(`Out of AI credits for today! Your daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
+      return;
+    }
     const q = pdfQuestion;
     setPdfQuestion('');
     setChatMessages((prev) => [...prev, { role: 'user', text: q }]);
@@ -141,6 +152,10 @@ export const AIStudioPage: React.FC = () => {
 
   const handleRunWriter = async () => {
     if (!writerInput.trim()) return;
+    if (availableCredits < 1) {
+      toast.error(`Out of AI credits for today! Your daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
+      return;
+    }
     setIsWriterLoading(true);
     try {
       const res = await aiService.aiWriter({
@@ -178,8 +193,10 @@ export const AIStudioPage: React.FC = () => {
 
   const handleSaveToDrive = async (name: string, content: string) => {
     const fileName = `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.docx`;
-    await uploadToGoogleDrive(fileName, content);
+    const docData = convertMarkdownToHtml(content);
+    await uploadToGoogleDrive(fileName, docData, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     setSyncedFiles(getSyncedCloudFiles());
+    toast.success(`Exported "${fileName}" to Google Drive`);
   };
 
   const handleDownloadDirect = (name: string, content: string) => {
@@ -188,15 +205,50 @@ export const AIStudioPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Hidden PDF Upload */}
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Hidden File Input for PDF Chat */}
       <input
-        type="file"
         ref={pdfInputRef}
-        accept=".pdf,.doc,.docx,.txt"
+        type="file"
+        accept=".pdf,.docx,.xlsx,.txt"
         onChange={(e) => handleUploadChatFile(e.target.files)}
         className="hidden"
       />
+
+      {/* Canva-Style Real-time AI Credit Status Strip */}
+      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-900/50 via-indigo-900/50 to-brand-900/50 border border-purple-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white shadow-md">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center text-white shadow-xs">
+            <Zap className="w-4 h-4 text-amber-400 fill-amber-400 animate-pulse" />
+          </div>
+          <div>
+            <div className="font-bold flex items-center gap-2">
+              <span>AI Magic Credits: <strong>{availableCredits}</strong> / {totalCredits} Available</span>
+              <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-amber-400 text-slate-950 uppercase">
+                Active
+              </span>
+            </div>
+            <div className="text-[11px] text-purple-200">
+              Credits deduct in real-time based on tool usage • Auto-refills +{dailyAllocation} daily
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-xs border border-white/10 font-mono text-[11px] text-purple-200 flex items-center gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '10s' }} />
+            <span>Refills in: <strong>{formatTimeRemaining(refillSecondsRemaining)}</strong></span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/billing')}
+            className="border-purple-400/40 text-purple-200 hover:bg-purple-600/30 text-xs"
+          >
+            Upgrade
+          </Button>
+        </div>
+      </div>
 
       {/* Sync & Export Top Banner */}
       <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/60 via-indigo-950/60 to-purple-950/60 border border-blue-500/30 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
@@ -230,14 +282,14 @@ export const AIStudioPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs Switcher */}
+      {/* Tabs Switcher with Cost Chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200 dark:border-slate-800">
         {[
-          { id: 'wizard', name: 'Document Wizard (Real Gemini AI)', icon: Wand2 },
-          { id: 'writer', name: 'AI Writer & Translator', icon: FileText },
-          { id: 'pdf_chat', name: 'Document QA Copilot', icon: FileStack },
-          { id: 'presentation', name: 'Presentation Maker', icon: Presentation },
-          { id: 'cloud', name: 'Google Drive / Gmail Cloud', icon: Cloud },
+          { id: 'wizard', name: 'Document Wizard', cost: '2-3⚡', icon: Wand2 },
+          { id: 'writer', name: 'AI Writer & Translator', cost: '1⚡', icon: FileText },
+          { id: 'pdf_chat', name: 'Document QA Copilot', cost: '1⚡', icon: FileStack },
+          { id: 'presentation', name: 'Presentation Maker', cost: '3⚡', icon: Presentation },
+          { id: 'cloud', name: 'Google Drive / Gmail Cloud', cost: 'Free', icon: Cloud },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -250,6 +302,15 @@ export const AIStudioPage: React.FC = () => {
           >
             <tab.icon className="w-4 h-4" />
             <span>{tab.name}</span>
+            <span
+              className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                activeTab === tab.id
+                  ? 'bg-purple-800/80 text-purple-200'
+                  : 'bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 font-bold'
+              }`}
+            >
+              {tab.cost}
+            </span>
           </button>
         ))}
       </div>

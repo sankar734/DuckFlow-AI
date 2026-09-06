@@ -3,7 +3,17 @@ export interface AICreditState {
   usedCredits: number;
   availableCredits: number;
   planId: string;
-  history: Array<{
+  dailyAllocation?: number;
+  lastRefillAt?: string;
+  nextRefillAt?: string;
+  refillSecondsRemaining?: number;
+  costMatrix?: Array<{
+    tool: string;
+    cost: number;
+    category?: string;
+    description?: string;
+  }>;
+  history?: Array<{
     _id: string;
     operation: string;
     creditsUsed: number;

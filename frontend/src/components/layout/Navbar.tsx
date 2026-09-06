@@ -33,6 +33,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
 import { useUIStore } from '../../store/uiStore';
 import { useNotificationStore } from '../../store/notificationStore';
+import { useCreditStore, formatTimeRemaining, startCreditTimer } from '../../store/creditStore';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 
@@ -43,10 +44,25 @@ export const Navbar: React.FC = () => {
   const { openCommandPalette, openMobileScanner } = useUIStore();
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotificationStore();
 
+  const {
+    availableCredits,
+    totalCredits,
+    dailyAllocation,
+    refillSecondsRemaining,
+    costMatrix,
+    fetchCredits,
+  } = useCreditStore();
+
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isCreditsMenuOpen, setIsCreditsMenuOpen] = useState(false);
+
+  React.useEffect(() => {
+    fetchCredits();
+    startCreditTimer();
+  }, []);
 
   const mainNavLinks = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -173,6 +189,135 @@ export const Navbar: React.FC = () => {
                     <div className="text-[10px] text-slate-400">Camera & OCR extract</div>
                   </div>
                 </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Canva-Style AI Credits Interactive Widget */}
+        <div className="relative">
+          <button
+            onClick={() => setIsCreditsMenuOpen(!isCreditsMenuOpen)}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-500/10 via-brand-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-700 dark:text-purple-300 text-xs font-semibold border border-purple-500/30 dark:border-purple-500/40 shadow-xs transition-all cursor-pointer group"
+            title="AI Magic Credits & Daily Refill"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500 animate-pulse group-hover:scale-110 transition-transform" />
+            <span className="font-extrabold text-slate-900 dark:text-white">
+              {availableCredits}
+            </span>
+            <span className="hidden xs:inline text-purple-600 dark:text-purple-300 text-[11px] font-medium">
+              Credits
+            </span>
+          </button>
+
+          {isCreditsMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsCreditsMenuOpen(false)} />
+              <div className="absolute right-0 mt-2 w-80 sm:w-92 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-purple-200/80 dark:border-purple-900/60 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 via-indigo-600 to-brand-600 flex items-center justify-center text-white shadow-xs">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        AI Magic Credits
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 uppercase">
+                          {user?.planId || 'Free'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">Usage-based real-time deduction</div>
+                    </div>
+                  </div>
+                  <Link
+                    to="/billing"
+                    onClick={() => setIsCreditsMenuOpen(false)}
+                    className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+                  >
+                    Upgrade
+                  </Link>
+                </div>
+
+                {/* Progress Bar & Available Counter */}
+                <div className="my-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/70 dark:border-slate-800">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Available Credits</span>
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {availableCredits} <span className="text-slate-400 text-[11px] font-normal">/ {totalCredits}</span>
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        availableCredits / (totalCredits || 1) > 0.4
+                          ? 'bg-gradient-to-r from-emerald-500 via-brand-500 to-purple-600'
+                          : availableCredits / (totalCredits || 1) > 0.15
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                          : 'bg-gradient-to-r from-rose-500 to-red-600'
+                      }`}
+                      style={{
+                        width: `${Math.max(4, Math.min(100, Math.round((availableCredits / (totalCredits || 1)) * 100)))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Daily Refill Countdown Banner (Canva Style) */}
+                <div className="p-3 rounded-xl bg-gradient-to-r from-brand-500/10 via-purple-500/10 to-indigo-500/10 border border-purple-500/20 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded-md bg-purple-600 text-white shrink-0">
+                      <Clock className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '8s' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-slate-900 dark:text-white flex items-center justify-between">
+                        <span>Daily Credit Refill</span>
+                        <span className="text-purple-600 dark:text-purple-400 font-mono">
+                          {formatTimeRemaining(refillSecondsRemaining)}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                        +{dailyAllocation} credits replenish automatically every 24h
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Feature Cost Matrix */}
+                <div className="mt-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 px-0.5">
+                    Credit Cost Per Action
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                    {costMatrix.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-1.5 px-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 text-slate-700 dark:text-slate-300"
+                      >
+                        <span className="truncate pr-1">{item.tool}</span>
+                        <span className="font-bold text-purple-600 dark:text-purple-400 shrink-0">
+                          {item.cost}⚡
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-3.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex gap-2">
+                  <Button
+                    variant="gradient"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => {
+                      setIsCreditsMenuOpen(false);
+                      navigate('/ai');
+                    }}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1" />
+                    Open AI Studio
+                  </Button>
+                </div>
               </div>
             </>
           )}

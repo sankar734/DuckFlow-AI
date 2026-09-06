@@ -24,6 +24,8 @@ export interface IUser extends MongooseDocument {
   storageLimit: number; // in bytes (e.g. 5GB = 5 * 1024 * 1024 * 1024)
   aiCredits: number;
   aiCreditsUsed: number;
+  lastCreditRefillAt?: Date;
+  dailyCreditsAllocation?: number;
   preferences: {
     theme: 'light' | 'dark' | 'system';
     language: string;
@@ -57,6 +59,8 @@ const UserSchema = new Schema<IUser>(
     storageLimit: { type: Number, default: 5 * 1024 * 1024 * 1024 }, // 5GB default
     aiCredits: { type: Number, default: 50 },
     aiCreditsUsed: { type: Number, default: 0 },
+    lastCreditRefillAt: { type: Date, default: Date.now },
+    dailyCreditsAllocation: { type: Number, default: 50 },
     preferences: {
       theme: { type: String, enum: ['light', 'dark', 'system'], default: 'dark' },
       language: { type: String, default: 'en' },
