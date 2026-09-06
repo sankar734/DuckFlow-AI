@@ -276,6 +276,8 @@ export const AIStudioPage: React.FC = () => {
                     'Executive Proposal',
                     'Research Report',
                     'Professional Resume',
+                    'Commercial Invoice & Bill',
+                    'Formal Leave & HR Letter',
                     'Client Service Agreement',
                     'Project Roadmap Brief',
                     'Financial Assessment',
@@ -285,6 +287,32 @@ export const AIStudioPage: React.FC = () => {
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Quick Prompt Starters */}
+              <div>
+                <label className="text-[11px] font-semibold text-slate-500 mb-1.5 block">Quick Templates</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: '📄 Resume', type: 'Professional Resume', prompt: 'Create a Senior Software Architect professional resume with technical skills, career milestones, project impact, and education.' },
+                    { label: '🧾 Invoice', type: 'Commercial Invoice & Bill', prompt: 'Generate an official commercial tax invoice for software consulting services with itemized deliverables, taxes, bank details, and payment terms.' },
+                    { label: '📊 Project Report', type: 'Research Report', prompt: 'Create a detailed technical project report on AI-Powered Document Processing Architecture with executive summary, methodology, performance metrics, and conclusion.' },
+                    { label: '💼 Business Proposal', type: 'Executive Proposal', prompt: 'Draft an executive business proposal for an Enterprise Cloud Migration and Automation platform with ROI analysis, timelines, and deliverables.' },
+                    { label: '✉️ Leave Letter', type: 'Formal Leave & HR Letter', prompt: 'Write a formal medical leave letter request to HR and manager detailing duration, handover notes, and emergency contact details.' },
+                  ].map((tpl) => (
+                    <button
+                      key={tpl.label}
+                      type="button"
+                      onClick={() => {
+                        setDocType(tpl.type);
+                        setWizardPrompt(tpl.prompt);
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-purple-100 dark:hover:bg-purple-950/60 hover:text-purple-600 transition-colors"
+                    >
+                      {tpl.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>

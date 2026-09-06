@@ -106,6 +106,7 @@ export const ConverterPage: React.FC = () => {
     htmlContent?: string;
     tableData?: { headers: string[]; rows: string[][] };
     slides?: Array<{ title: string; subtitle?: string; content: string[] }>;
+    engineUsed?: string;
   }> => {
     if (!item.file) throw new Error('File not found');
 
@@ -114,7 +115,46 @@ export const ConverterPage: React.FC = () => {
       lineSpacingMultiplier: lineSpacing === '1.5' ? 1.45 : lineSpacing === '2.0' ? 1.9 : 1.2,
     };
 
-    // Client-side high-fidelity vector engine
+    // 1. Try Server-Side Office Conversion API first if online
+    try {
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(item.file!);
+      });
+      const fileData = await base64Promise;
+
+      const backendResp = await api.post('/conversions', {
+        sourceFileName: item.fileName,
+        sourceFormat: item.sourceFormat,
+        targetFormat: item.targetFormat,
+        fileSize: item.file.size,
+        fileData,
+        options: conversionOptions,
+      });
+
+      if (backendResp?.data?.downloadUrl) {
+        const fullDownloadUrl = backendResp.data.downloadUrl.startsWith('http')
+          ? backendResp.data.downloadUrl
+          : `${api.defaults.baseURL?.replace(/\/api\/v1$/, '') || ''}${backendResp.data.downloadUrl}`;
+
+        // Fetch PDF blob from server
+        const pdfRes = await fetch(fullDownloadUrl);
+        const pdfBlob = await pdfRes.blob();
+        const localBlobUrl = URL.createObjectURL(pdfBlob);
+
+        return {
+          url: localBlobUrl,
+          blob: pdfBlob,
+          extractedText: `Document: ${item.fileName}`,
+          engineUsed: backendResp.data.converterEngine || 'DocuFlow Office Cloud Engine',
+        };
+      }
+    } catch (serverErr) {
+      console.warn('Server conversion fallback to client high-fidelity vector engine:', serverErr);
+    }
+
+    // 2. High-Fidelity Client Vector & OOXML Parser Engine
     const result: ConvertedPDFResult = await convertFileToRealPDF(item.file, item.targetFormat, conversionOptions);
     return {
       url: result.url,
@@ -123,6 +163,7 @@ export const ConverterPage: React.FC = () => {
       htmlContent: result.htmlContent,
       tableData: result.tableData,
       slides: result.slides,
+      engineUsed: result.engineUsed || 'DocuFlow High-Fidelity Vector Engine',
     };
   };
 
@@ -133,7 +174,7 @@ export const ConverterPage: React.FC = () => {
     setQueue((prev) =>
       prev.map((it) =>
         it.id === id
-          ? { ...it, status: 'CONVERTING', progress: 25, stageMessage: 'Analyzing sections, headings & alignments...' }
+          ? { ...it, status: 'CONVERTING', progress: 20, stageMessage: 'Analyzing document structure & typography...' }
           : it
       )
     );
@@ -142,7 +183,7 @@ export const ConverterPage: React.FC = () => {
       setQueue((prev) =>
         prev.map((it) =>
           it.id === id
-            ? { ...it, progress: 65, stageMessage: 'Formatting 1-inch margins, 1.5x line spacing & divider pages...' }
+            ? { ...it, progress: 60, stageMessage: 'Rendering vectors, tables & embedded media...' }
             : it
         )
       );
@@ -152,7 +193,7 @@ export const ConverterPage: React.FC = () => {
       setQueue((prev) =>
         prev.map((it) =>
           it.id === id
-            ? { ...it, progress: 95, stageMessage: 'Rendering Table of Contents & page numbers...' }
+            ? { ...it, progress: 90, stageMessage: 'Validating PDF layout & page headers...' }
             : it
         )
       );
@@ -164,7 +205,7 @@ export const ConverterPage: React.FC = () => {
               ...it,
               status: 'COMPLETED',
               progress: 100,
-              stageMessage: 'Academic Report conversion complete',
+              stageMessage: `Conversion complete (${result.engineUsed || 'High-Fidelity Engine'})`,
               downloadUrl: result.url,
               pdfBlob: result.blob,
               extractedText: result.extractedText,
@@ -176,14 +217,14 @@ export const ConverterPage: React.FC = () => {
           return it;
         })
       );
-      toast.success(`Converted "${item.fileName}" into perfectly formatted PDF Report!`);
+      toast.success(`Converted "${item.fileName}" into high-fidelity PDF!`);
     } catch (err: any) {
       console.error('Conversion error:', err);
       toast.error(`Error converting ${item.fileName}`);
       setQueue((prev) =>
         prev.map((it) =>
           it.id === id
-            ? { ...it, status: 'FAILED', progress: 0, stageMessage: 'Conversion failed. Original file safe.' }
+            ? { ...it, status: 'FAILED', progress: 0, stageMessage: 'Conversion failed. Original document safe.' }
             : it
         )
       );

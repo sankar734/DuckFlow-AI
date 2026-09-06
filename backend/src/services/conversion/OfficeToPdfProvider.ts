@@ -237,67 +237,105 @@ export class OfficeToPdfProvider implements IConversionProvider {
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     const isLandscape = options.pageOrientation === 'landscape';
-    const pageWidth = isLandscape ? 842 : 595;
-    const pageHeight = isLandscape ? 595 : 842;
-    const margin = 50;
+    const pageWidth = isLandscape ? 841.9 : 595.3;
+    const pageHeight = isLandscape ? 595.3 : 841.9;
+    const marginLeft = 54;
+    const marginRight = 54;
+    const marginTop = 54;
+    const marginBottom = 54;
+    const contentWidth = pageWidth - marginLeft - marginRight;
 
-    const page = pdfDoc.addPage([pageWidth, pageHeight]);
+    let page = pdfDoc.addPage([pageWidth, pageHeight]);
+    let pageNum = 1;
+    let y = pageHeight - marginTop;
 
-    // Header Accent
-    page.drawRectangle({
-      x: 0,
-      y: pageHeight - 48,
-      width: pageWidth,
-      height: 48,
-      color: rgb(43 / 255, 87 / 255, 154 / 255),
-    });
-
-    const cleanTitle = sourceFileName.replace(/\.[^/.]+$/, '');
-    page.drawText(cleanTitle, {
-      x: margin,
-      y: pageHeight - 30,
-      size: 14,
-      font: fontBold,
-      color: rgb(1, 1, 1),
-    });
-
-    page.drawText(`DocuFlow AI Native Output • Converted from ${sourceFormat.toUpperCase()}`, {
-      x: margin,
-      y: pageHeight - 42,
-      size: 8,
-      font,
-      color: rgb(0.88, 0.91, 1),
-    });
-
-    // Body text extract
-    const extractedText = inputBuffer.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ');
-    const lines = extractedText.split(/\r\n|\n/).filter((l) => l.trim().length > 0).slice(0, 45);
-
-    let y = pageHeight - 80;
-    for (const line of lines) {
-      if (y < margin + 30) break;
-      const safeLine = line.length > 90 ? line.substring(0, 88) + '...' : line;
-      page.drawText(safeLine, {
-        x: margin,
-        y,
-        size: 10,
+    const addNewPage = () => {
+      // Draw footer on previous page
+      page.drawText(String(pageNum), {
+        x: pageWidth / 2 - 4,
+        y: 28,
+        size: 9,
         font,
-        color: rgb(0.15, 0.2, 0.25),
+        color: rgb(0.5, 0.5, 0.5),
       });
-      y -= 16;
+
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      pageNum++;
+      y = pageHeight - marginTop;
+    };
+
+    // Clean plain text
+    const rawText = inputBuffer.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+    const paragraphs = rawText.split(/\r\n|\n/).map((l) => l.trim()).filter(Boolean);
+
+    for (const p of paragraphs) {
+      const isHeader = p.length < 60 && (p.toUpperCase() === p || p.endsWith(':'));
+      const fontSize = isHeader ? 12 : 10;
+      const currentFont = isHeader ? fontBold : font;
+      const lineHeight = fontSize * 1.35;
+
+      // Word wrapping helper
+      const words = p.split(/\s+/);
+      let currentLine = '';
+
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const textWidth = currentFont.widthOfTextAtSize(testLine, fontSize);
+
+        if (textWidth > contentWidth && currentLine) {
+          if (y < marginBottom + lineHeight) addNewPage();
+          page.drawText(currentLine, {
+            x: marginLeft,
+            y,
+            size: fontSize,
+            font: currentFont,
+            color: isHeader ? rgb(0.1, 0.15, 0.25) : rgb(0.2, 0.25, 0.3),
+          });
+          y -= lineHeight;
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+
+      if (currentLine) {
+        if (y < marginBottom + lineHeight) addNewPage();
+        page.drawText(currentLine, {
+          x: marginLeft,
+          y,
+          size: fontSize,
+          font: currentFont,
+          color: isHeader ? rgb(0.1, 0.15, 0.25) : rgb(0.2, 0.25, 0.3),
+        });
+        y -= lineHeight;
+      }
+
+      y -= isHeader ? 6 : 4; // Space after paragraph
     }
+
+    // Draw final page footer
+    page.drawText(String(pageNum), {
+      x: pageWidth / 2 - 4,
+      y: 28,
+      size: 9,
+      font,
+      color: rgb(0.5, 0.5, 0.5),
+    });
 
     // Apply Watermark if requested
     if (options.watermarkText) {
-      page.drawText(options.watermarkText, {
-        x: pageWidth / 4,
-        y: pageHeight / 2,
-        size: 40,
-        font: fontBold,
-        color: rgb(0.8, 0.8, 0.8),
-        rotate: { type: 'degrees' as any, angle: 45 },
-        opacity: options.watermarkOpacity || 0.3,
-      });
+      const pages = pdfDoc.getPages();
+      for (const p of pages) {
+        p.drawText(options.watermarkText, {
+          x: pageWidth / 4,
+          y: pageHeight / 2,
+          size: 40,
+          font: fontBold,
+          color: rgb(0.8, 0.8, 0.8),
+          rotate: { type: 'degrees' as any, angle: 45 },
+          opacity: options.watermarkOpacity || 0.3,
+        });
+      }
     }
 
     const pdfBytes = await pdfDoc.save();
