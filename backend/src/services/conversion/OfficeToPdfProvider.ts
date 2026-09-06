@@ -336,12 +336,13 @@ export class OfficeToPdfProvider implements IConversionProvider {
       const elemXml = elem[0];
 
       // 1. Check for Explicit Page Breaks Before / Within Paragraph
-      const hasPageBreakBefore =
+      const hasPageBreak =
         elemXml.includes('<w:pageBreakBefore') ||
         elemXml.includes('w:type="page"') ||
-        elemXml.includes('<w:lastRenderedPageBreak');
+        elemXml.includes('<w:lastRenderedPageBreak') ||
+        elemXml.includes('<w:sectPr');
 
-      if (hasPageBreakBefore && y < pageHeight - marginTop - 20) {
+      if (hasPageBreak && y < pageHeight - marginTop) {
         startNewPage();
       }
 

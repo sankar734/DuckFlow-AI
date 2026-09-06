@@ -115,56 +115,42 @@ export const ConverterPage: React.FC = () => {
       lineSpacingMultiplier: lineSpacing === '1.5' ? 1.45 : lineSpacing === '2.0' ? 1.9 : 1.2,
     };
 
-    // 1. Try Server-Side Office Conversion API first if online
-    try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(item.file!);
-      });
-      const fileData = await base64Promise;
+    // 1. Server-Side Universal Conversion Engine
+    const reader = new FileReader();
+    const base64Promise = new Promise<string>((resolve) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(item.file!);
+    });
+    const fileData = await base64Promise;
 
-      const backendResp = await api.post('/conversions', {
-        sourceFileName: item.fileName,
-        sourceFormat: item.sourceFormat,
-        targetFormat: item.targetFormat,
-        fileSize: item.file.size,
-        fileData,
-        options: conversionOptions,
-      });
+    const backendResp = await api.post('/conversions', {
+      sourceFileName: item.fileName,
+      sourceFormat: item.sourceFormat,
+      targetFormat: item.targetFormat,
+      fileSize: item.file.size,
+      fileData,
+      options: conversionOptions,
+    });
 
-      if (backendResp?.data?.downloadUrl) {
-        const fullDownloadUrl = backendResp.data.downloadUrl.startsWith('http')
-          ? backendResp.data.downloadUrl
-          : `${api.defaults.baseURL?.replace(/\/api\/v1$/, '') || ''}${backendResp.data.downloadUrl}`;
+    if (backendResp?.data?.downloadUrl) {
+      const fullDownloadUrl = backendResp.data.downloadUrl.startsWith('http')
+        ? backendResp.data.downloadUrl
+        : `${api.defaults.baseURL?.replace(/\/api\/v1$/, '') || ''}${backendResp.data.downloadUrl}`;
 
-        // Fetch PDF blob from server
-        const pdfRes = await fetch(fullDownloadUrl);
-        const pdfBlob = await pdfRes.blob();
-        const localBlobUrl = URL.createObjectURL(pdfBlob);
+      // Fetch PDF blob from server
+      const pdfRes = await fetch(fullDownloadUrl);
+      const pdfBlob = await pdfRes.blob();
+      const localBlobUrl = URL.createObjectURL(pdfBlob);
 
-        return {
-          url: localBlobUrl,
-          blob: pdfBlob,
-          extractedText: `Document: ${item.fileName}`,
-          engineUsed: backendResp.data.converterEngine || 'DocuFlow Office Cloud Engine',
-        };
-      }
-    } catch (serverErr) {
-      console.warn('Server conversion fallback to client high-fidelity vector engine:', serverErr);
+      return {
+        url: localBlobUrl,
+        blob: pdfBlob,
+        extractedText: `Document: ${item.fileName}`,
+        engineUsed: backendResp.data.converterEngine || 'DocuFlow Universal Conversion Engine',
+      };
     }
 
-    // 2. High-Fidelity Client Vector & OOXML Parser Engine
-    const result: ConvertedPDFResult = await convertFileToRealPDF(item.file, item.targetFormat, conversionOptions);
-    return {
-      url: result.url,
-      blob: result.blob,
-      extractedText: result.extractedText,
-      htmlContent: result.htmlContent,
-      tableData: result.tableData,
-      slides: result.slides,
-      engineUsed: result.engineUsed || 'DocuFlow High-Fidelity Vector Engine',
-    };
+    throw new Error(backendResp?.data?.message || 'Server conversion failed to generate output');
   };
 
   const handleConvertItem = async (id: string) => {

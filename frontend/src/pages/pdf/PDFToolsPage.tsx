@@ -23,7 +23,8 @@ import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { DocumentPreviewModal } from '../../components/documents/DocumentPreviewModal';
-import { convertFileToRealPDF, ConvertedPDFResult } from '../../utils/pdfGenerator';
+import { ConvertedPDFResult } from '../../utils/pdfGenerator';
+import { api } from '../../services/api';
 import { toast } from 'sonner';
 
 interface ToolItem {
@@ -106,14 +107,54 @@ export const PDFToolsPage: React.FC = () => {
         rotationAngle: selectedTool?.id === 'rotate_pdf' ? parseInt(rotationAngle, 10) : undefined,
       };
 
-      const result = await convertFileToRealPDF(selectedFile, selectedTool?.outputExt || 'PDF', options);
-      setProcessedResult(result);
-      setIsExecuting(false);
-      setIsCompleted(true);
-      toast.success(`Processed "${selectedFile.name}" with real content preserved!`);
+      // Read file data
+      const reader = new FileReader();
+      const fileDataPromise = new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(selectedFile);
+      });
+      const fileData = await fileDataPromise;
+
+      const srcFmt = selectedFile.name.split('.').pop()?.toUpperCase() || 'DOCX';
+      const tgtFmt = (selectedTool?.outputExt || 'PDF').toUpperCase();
+
+      const resp = await api.post('/conversions', {
+        sourceFileName: selectedFile.name,
+        sourceFormat: srcFmt,
+        targetFormat: tgtFmt,
+        fileSize: selectedFile.size,
+        fileData,
+        options,
+      });
+
+      if (resp?.data?.downloadUrl) {
+        const fullUrl = resp.data.downloadUrl.startsWith('http')
+          ? resp.data.downloadUrl
+          : `${api.defaults.baseURL?.replace(/\/api\/v1$/, '') || ''}${resp.data.downloadUrl}`;
+
+        const pdfRes = await fetch(fullUrl);
+        const pdfBlob = await pdfRes.blob();
+        const localBlobUrl = URL.createObjectURL(pdfBlob);
+
+        setProcessedResult({
+          blob: pdfBlob,
+          url: localBlobUrl,
+          extractedText: selectedFile.name,
+          pageCount: resp.data.pageCount || 1,
+          fileName: selectedFile.name,
+          engineUsed: resp.data.converterEngine,
+        });
+
+        setIsExecuting(false);
+        setIsCompleted(true);
+        toast.success(`Processed "${selectedFile.name}" with full fidelity preserved!`);
+        return;
+      }
+
+      throw new Error(resp?.data?.message || 'Server conversion failed to generate output');
     } catch (err: any) {
       console.error('Processing error:', err);
-      toast.error('Error processing document');
+      toast.error(err.response?.data?.message || err.message || 'Error processing document');
       setIsExecuting(false);
     }
   };

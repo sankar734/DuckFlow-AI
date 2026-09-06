@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import crypto from 'crypto';
 import { ConversionJob, ConversionStatus } from '../models/ConversionJob';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
@@ -153,6 +154,11 @@ export class ConversionService {
       job.progress = 25;
       await job.save();
 
+      const inputSha256 = crypto.createHash('sha256').update(inputBuffer).digest('hex');
+      logger.info(
+        `[CONVERSION] jobId=${job._id} sourceFormat=${srcFmt} targetFormat=${tgtFmt} inputSize=${inputBuffer.length} inputHash=${inputSha256}`
+      );
+
       const analysis = await DocumentAnalyzer.analyze(inputBuffer, srcFmt);
       logger.info(`Document Analysis for Job ${job._id}:`, {
         format: analysis.format,
@@ -209,7 +215,7 @@ export class ConversionService {
       const conversionsDir = path.join(this.storageDir, 'users', userId, 'documents', String(job._id), 'conversions');
       fs.mkdirSync(conversionsDir, { recursive: true });
 
-      const storageKey = `converted_${Date.now()}_${targetFileName}`;
+      const storageKey = `converted_${job._id}_${targetFileName}`;
       const finalOutputPath = path.join(this.storageDir, storageKey);
       fs.writeFileSync(finalOutputPath, providerResult.outputBuffer);
 
