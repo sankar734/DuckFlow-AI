@@ -496,19 +496,25 @@ export class DocxDeepParser {
     const dataUrl = this.mediaMap.get(rId);
     if (!dataUrl) return null;
 
-    // Get exact extent dimensions in EMUs
-    const extent = drawingNode.getElementsByTagName('wp:extent')[0];
-    let widthPx = 450;
-    let heightPx = 250;
+    // Get exact extent dimensions in EMUs from wp:extent or a:ext
+    const extent =
+      drawingNode.getElementsByTagName('wp:extent')[0] ||
+      drawingNode.getElementsByTagName('a:ext')[0];
+
+    let widthPt = 140;
+    let heightPt = 70;
 
     if (extent) {
       const cx = parseInt(extent.getAttribute('cx') || '0', 10);
       const cy = parseInt(extent.getAttribute('cy') || '0', 10);
-      if (cx > 0) widthPx = Math.min(650, Math.round(UnitConversions.emusToPixels(cx)));
-      if (cy > 0) heightPx = Math.round(UnitConversions.emusToPixels(cy));
+      if (cx > 0) widthPt = UnitConversions.emusToPoints(cx);
+      if (cy > 0) heightPt = UnitConversions.emusToPoints(cy);
     }
 
-    return `<img src="${dataUrl}" style="max-width: 100%; width: ${widthPx}px; height: auto; border-radius: 6px; margin: 12px auto; display: block; box-shadow: 0 2px 4px rgba(0,0,0,0.08);" alt="Embedded Document Media" />`;
+    const widthPx = Math.round(UnitConversions.pointsToPixels(widthPt));
+    const heightPx = Math.round(UnitConversions.pointsToPixels(heightPt));
+
+    return `<img src="${dataUrl}" width="${widthPt}" height="${heightPt}" style="max-width: 100%; width: ${widthPx}px; height: ${heightPx}px; object-fit: contain; margin: 8px auto; display: block;" alt="Embedded Document Media" />`;
   }
 
   /**

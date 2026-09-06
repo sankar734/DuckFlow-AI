@@ -1,0 +1,48 @@
+# DocuFlow AI - High-Fidelity Conversion Worker Dockerfile
+# Provides isolated environment with Node.js 20, LibreOffice Headless, and metric-compatible fonts
+
+FROM node:20-bookworm-slim
+
+# Install LibreOffice, fontconfig, and standard open-source metric-compatible fonts
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice \
+    libreoffice-writer \
+    libreoffice-calc \
+    libreoffice-impress \
+    fontconfig \
+    fonts-liberation \
+    fonts-liberation2 \
+    fonts-dejavu-core \
+    fonts-noto-core \
+    fonts-freefont-ttf \
+    ca-certificates \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Refresh font cache
+RUN fc-cache -f -v
+
+# Create non-root application user
+WORKDIR /app
+
+# Copy backend dependency declarations
+COPY backend/package*.json ./
+
+# Install production dependencies
+RUN npm ci --only=production
+
+# Copy built backend sources
+COPY backend/dist ./dist
+
+# Environment variables
+ENV NODE_ENV=production \
+    LIBREOFFICE_PATH=/usr/bin/libreoffice \
+    CONVERSION_TIMEOUT_MS=45000 \
+    PORT=5000
+
+# Expose API port
+EXPOSE 5000
+
+# Start server
+CMD ["node", "dist/app.js"]

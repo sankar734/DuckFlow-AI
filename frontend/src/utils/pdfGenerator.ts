@@ -337,9 +337,11 @@ export function generateFormattedDocumentPDF(
           node.classList.contains('page-break') ||
           node.getAttribute('data-page-break') === 'true' ||
           style.includes('page-break-after: always') ||
-          style.includes('page-break-before: always')
+          style.includes('page-break-before: always') ||
+          node.innerHTML.includes('data-page-break') ||
+          node.innerHTML.includes('page-break-after')
         ) {
-          if (y > marginTop) advanceToNewPage();
+          advanceToNewPage();
           continue;
         }
 
@@ -351,9 +353,10 @@ export function generateFormattedDocumentPDF(
             try {
               const formatMatch = src.match(/data:image\/([a-zA-Z]+);base64,/);
               const format = formatMatch ? formatMatch[1].toUpperCase().replace('JPEG', 'JPG') : 'PNG';
-              const imgW = parseFloat(imgEl.getAttribute('width') || '300') || 300;
-              const imgH = parseFloat(imgEl.getAttribute('height') || '200') || 200;
-              const scale = Math.min(contentWidth / imgW, 1);
+              const imgW = parseFloat(imgEl.getAttribute('width') || '140') || 140;
+              const imgH = parseFloat(imgEl.getAttribute('height') || '70') || 70;
+              const maxAllowedW = Math.min(contentWidth, 320);
+              const scale = imgW > maxAllowedW ? maxAllowedW / imgW : 1;
               const finalW = imgW * scale;
               const finalH = imgH * scale;
 

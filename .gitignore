@@ -34,4 +34,8 @@ dist-ssr
 temp
 uploads/*
 !uploads/.gitkeep
-storage/invoices/*
+storage/*
+!storage/.gitkeep
+test_output/
+backend/test_output/
+
