@@ -231,6 +231,63 @@ export const BillingPage: React.FC = () => {
         })}
       </div>
 
+      {/* Dynamic Credit Consumption Matrix Guide */}
+      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-purple-600" />
+            <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              Transparent Credit Usage Matrix (Real-Time Dynamic Deductions)
+            </span>
+          </div>
+          <span className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold">
+            Auto-Refills +{dailyAllocation} credits every 24h
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900 dark:text-white">Quick Tasks</span>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-extrabold font-mono">1–2⚡</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              Short questions, grammar fixes, quick rewrites, and 1-paragraph translations.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900 dark:text-white">Standard Docs</span>
+              <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-extrabold font-mono">3–8⚡</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              Standard 2-3 page document drafting, summaries, and medium prompt expansions.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900 dark:text-white">In-Depth Multi-Page</span>
+              <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[10px] font-extrabold font-mono">15–25⚡</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              Long prompt synthesis, comprehensive reports, multi-page business proposals.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-purple-500/30 dark:border-purple-500/30 bg-purple-500/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900 dark:text-white">Full Enterprise Docs</span>
+              <span className="px-2 py-0.5 rounded-md bg-purple-600 text-white text-[10px] font-extrabold font-mono">35–50⚡</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              Exhaustive 2000+ character prompts, multi-chapter research, & 15+ slide deck architectures.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Invoices History Table */}
       <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">

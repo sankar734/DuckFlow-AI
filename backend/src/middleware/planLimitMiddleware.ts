@@ -29,8 +29,24 @@ export const checkAICredits = (requiredCredits: number = 1) => {
       await req.user.save();
     }
 
+    // Calculate dynamic required credits based on prompt size if present
+    let neededCredits = requiredCredits;
+    const promptText = req.body?.prompt || req.body?.content || req.body?.text || '';
+    if (promptText && promptText.length > 300) {
+      if (promptText.length > 2000) {
+        neededCredits = Math.max(neededCredits, 20);
+      } else if (promptText.length > 1000) {
+        neededCredits = Math.max(neededCredits, 12);
+      } else {
+        neededCredits = Math.max(neededCredits, 5);
+      }
+    }
+    if (req.body?.length === 'Long' || req.body?.length === 'Comprehensive') {
+      neededCredits = Math.max(neededCredits, req.body?.length === 'Comprehensive' ? 30 : 15);
+    }
+
     const availableCredits = Math.max(0, req.user.aiCredits - req.user.aiCreditsUsed);
-    if (availableCredits < requiredCredits) {
+    if (availableCredits < neededCredits) {
       const currentRefill = req.user.lastCreditRefillAt ? new Date(req.user.lastCreditRefillAt) : now;
       const nextRefillAt = new Date(currentRefill.getTime() + ONE_DAY_MS);
       const refillHoursRemaining = Math.max(1, Math.ceil((nextRefillAt.getTime() - now.getTime()) / (1000 * 3600)));
@@ -38,9 +54,9 @@ export const checkAICredits = (requiredCredits: number = 1) => {
       sendError(
         res,
         'AI_CREDITS_EXHAUSTED',
-        `Insufficient AI credits. You need ${requiredCredits} credits, but have ${availableCredits} remaining. Your daily allowance will refill in ${refillHoursRemaining}h, or you can upgrade to Pro.`,
+        `Insufficient AI credits. You need ${neededCredits} credits for this prompt depth and document scope, but have ${availableCredits} remaining. Your daily allowance will refill in ${refillHoursRemaining}h, or you can upgrade to Pro.`,
         402,
-        { availableCredits, requiredCredits, nextRefillAt, refillHoursRemaining }
+        { availableCredits, requiredCredits: neededCredits, nextRefillAt, refillHoursRemaining }
       );
       return;
     }

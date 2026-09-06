@@ -38,13 +38,124 @@ interface CreditState {
 }
 
 export const defaultCostMatrix: AICostItem[] = [
-  { tool: 'AI Writer / Tone', cost: 1, category: 'Text', description: 'Rewriting, expanding, tone shift' },
-  { tool: 'PDF Context QA', cost: 1, category: 'Document', description: 'Ask questions from uploaded documents' },
-  { tool: 'Document Summary', cost: 1, category: 'Text', description: 'Instant executive summaries' },
-  { tool: 'Excel AI Analyst', cost: 2, category: 'Spreadsheet', description: 'Automated formulas and data analysis' },
-  { tool: 'Document Synthesis', cost: 2, category: 'Synthesis', description: 'Word report drafting & formatting' },
-  { tool: 'Presentation Gen', cost: 3, category: 'Slides', description: 'Multi-slide presentation outline' },
+  { tool: 'AI Writer / Tone', cost: 1, category: 'Text', description: 'Rewriting & quick adjustments (1–8⚡)' },
+  { tool: 'PDF Context QA', cost: 1, category: 'Document', description: 'Ask questions from documents (1–6⚡)' },
+  { tool: 'Document Summary', cost: 1, category: 'Text', description: 'Instant executive summaries (1–7⚡)' },
+  { tool: 'Excel AI Analyst', cost: 5, category: 'Spreadsheet', description: 'Spreadsheet models & formulas (5–15⚡)' },
+  { tool: 'Document Wizard', cost: 7, category: 'Synthesis', description: 'Standard to Comprehensive Reports (7–50⚡)' },
+  { tool: 'Presentation Gen', cost: 8, category: 'Slides', description: 'Multi-slide presentation decks (8–35⚡)' },
 ];
+
+export const estimateDynamicCredits = (
+  operation:
+    | 'DOCUMENT_WIZARD'
+    | 'WRITER'
+    | 'SUMMARIZE'
+    | 'PDF_CHAT'
+    | 'EXCEL_ANALYST'
+    | 'PRESENTATION_GEN'
+    | 'ARTIFACT_GEN',
+  prompt: string = '',
+  options?: {
+    length?: 'Short' | 'Medium' | 'Long' | 'Comprehensive' | string;
+    slideCount?: number;
+    contextLength?: number;
+  }
+): { credits: number; totalCredits: number; label: string; complexity: 'low' | 'medium' | 'high' | 'ultra' } => {
+  const text = (prompt || '').trim();
+  const charCount = text.length;
+  const wordCount = text ? text.split(/\s+/).length : 0;
+
+  let base = 1;
+  let promptBonus = 0;
+  let scopeBonus = 0;
+
+  if (charCount > 2000 || wordCount > 400) {
+    promptBonus = 18;
+  } else if (charCount > 1000 || wordCount > 200) {
+    promptBonus = 10;
+  } else if (charCount > 400 || wordCount > 80) {
+    promptBonus = 5;
+  } else if (charCount > 150 || wordCount > 30) {
+    promptBonus = 2;
+  }
+
+  switch (operation) {
+    case 'DOCUMENT_WIZARD':
+    case 'ARTIFACT_GEN': {
+      base = 2;
+      const requestedLength = (options?.length || 'Medium').toLowerCase();
+      if (
+        requestedLength.includes('comprehens') ||
+        requestedLength.includes('full') ||
+        requestedLength.includes('enterprise')
+      ) {
+        scopeBonus = 25;
+      } else if (requestedLength.includes('long') || requestedLength.includes('detailed')) {
+        scopeBonus = 12;
+      } else if (requestedLength.includes('medium')) {
+        scopeBonus = 5;
+      } else {
+        scopeBonus = 1;
+      }
+      break;
+    }
+    case 'PRESENTATION_GEN': {
+      base = 3;
+      const slides = options?.slideCount || 6;
+      if (slides >= 15) {
+        scopeBonus = 22;
+      } else if (slides >= 10) {
+        scopeBonus = 12;
+      } else if (slides >= 6) {
+        scopeBonus = 5;
+      }
+      break;
+    }
+    case 'EXCEL_ANALYST': {
+      base = 2;
+      if (charCount > 500 || (options?.contextLength && options.contextLength > 1000)) {
+        scopeBonus = 8;
+      } else {
+        scopeBonus = 3;
+      }
+      break;
+    }
+    case 'PDF_CHAT': {
+      base = 1;
+      if (options?.contextLength && options.contextLength > 5000) {
+        scopeBonus = 4;
+      } else if (charCount > 300) {
+        scopeBonus = 2;
+      }
+      break;
+    }
+    case 'WRITER':
+    case 'SUMMARIZE':
+    default: {
+      base = 1;
+      if (charCount > 1000) {
+        scopeBonus = 6;
+      } else if (charCount > 300) {
+        scopeBonus = 2;
+      }
+      break;
+    }
+  }
+
+  const credits = Math.min(50, Math.max(1, Math.round(base + promptBonus + scopeBonus)));
+  const complexity = credits > 30 ? 'ultra' : credits > 15 ? 'high' : credits > 5 ? 'medium' : 'low';
+  const label =
+    credits > 30
+      ? 'Comprehensive Enterprise Doc'
+      : credits > 15
+      ? 'Deep Multi-Section Prompt'
+      : credits > 5
+      ? 'Standard Document'
+      : 'Quick Prompt';
+
+  return { credits, totalCredits: credits, label, complexity };
+};
 
 export const useCreditStore = create<CreditState>((set, get) => ({
   availableCredits: 50,

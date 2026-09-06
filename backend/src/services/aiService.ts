@@ -62,6 +62,125 @@ export class AIService {
     return { refilled, nextRefillAt, refillSecondsRemaining, dailyAllocation };
   }
 
+  /**
+   * Calculates dynamic credits based on:
+   * 1. Base operation cost
+   * 2. Prompt length (characters / words / deep instructions)
+   * 3. Requested scope (Short, Medium, Long, Comprehensive / slide count / format)
+   * 4. Context length if document QA
+   */
+  calculateDynamicCredits(
+    operation:
+      | 'DOCUMENT_WIZARD'
+      | 'WRITER'
+      | 'SUMMARIZE'
+      | 'PDF_CHAT'
+      | 'EXCEL_ANALYST'
+      | 'PRESENTATION_GEN'
+      | 'ARTIFACT_GEN',
+    prompt: string = '',
+    options?: {
+      length?: 'Short' | 'Medium' | 'Long' | 'Comprehensive' | string;
+      slideCount?: number;
+      contextLength?: number;
+      format?: string;
+    }
+  ): { credits: number; breakdown: string; promptTokensEst: number } {
+    const text = (prompt || '').trim();
+    const charCount = text.length;
+    const wordCount = text ? text.split(/\s+/).length : 0;
+    const promptTokensEst = Math.ceil(charCount / 4);
+
+    let baseCredits = 1;
+    let lengthBonus = 0;
+    let promptComplexityBonus = 0;
+
+    // 1. Prompt Complexity Bonus (Calculated dynamically by character/word depth)
+    if (charCount > 2000 || wordCount > 400) {
+      promptComplexityBonus = 18; // Very deep prompt / full spec
+    } else if (charCount > 1000 || wordCount > 200) {
+      promptComplexityBonus = 10; // Large prompt
+    } else if (charCount > 400 || wordCount > 80) {
+      promptComplexityBonus = 5; // Medium-large prompt
+    } else if (charCount > 150 || wordCount > 30) {
+      promptComplexityBonus = 2; // Moderate prompt
+    }
+
+    // 2. Operation and Scope Bonuses
+    switch (operation) {
+      case 'DOCUMENT_WIZARD':
+      case 'ARTIFACT_GEN': {
+        baseCredits = 2;
+        const requestedLength = (options?.length || 'Medium').toLowerCase();
+        if (
+          requestedLength.includes('comprehens') ||
+          requestedLength.includes('full') ||
+          requestedLength.includes('enterprise')
+        ) {
+          lengthBonus = 25; // 35 - 50 credits total
+        } else if (requestedLength.includes('long') || requestedLength.includes('detailed')) {
+          lengthBonus = 12; // 15 - 25 credits total
+        } else if (requestedLength.includes('medium')) {
+          lengthBonus = 5; // 7 - 12 credits total
+        } else {
+          lengthBonus = 1; // Short: 3 - 5 credits
+        }
+        break;
+      }
+      case 'PRESENTATION_GEN': {
+        baseCredits = 3;
+        const slides = options?.slideCount || 6;
+        if (slides >= 15) {
+          lengthBonus = 22; // Massive deck: 28 - 45 credits
+        } else if (slides >= 10) {
+          lengthBonus = 12; // Large deck: 18 - 25 credits
+        } else if (slides >= 6) {
+          lengthBonus = 5; // Standard deck: 8 - 14 credits
+        }
+        break;
+      }
+      case 'EXCEL_ANALYST': {
+        baseCredits = 2;
+        if (charCount > 500 || (options?.contextLength && options.contextLength > 1000)) {
+          lengthBonus = 8;
+        } else {
+          lengthBonus = 3;
+        }
+        break;
+      }
+      case 'PDF_CHAT': {
+        baseCredits = 1;
+        if (options?.contextLength && options.contextLength > 5000) {
+          lengthBonus = 4;
+        } else if (charCount > 300) {
+          lengthBonus = 2;
+        }
+        break;
+      }
+      case 'WRITER':
+      case 'SUMMARIZE':
+      default: {
+        baseCredits = 1;
+        if (charCount > 1000) {
+          lengthBonus = 6;
+        } else if (charCount > 300) {
+          lengthBonus = 2;
+        }
+        break;
+      }
+    }
+
+    const calculated = Math.round(baseCredits + promptComplexityBonus + lengthBonus);
+    // Cap between 1 and 50 credits per request
+    const credits = Math.min(50, Math.max(1, calculated));
+
+    return {
+      credits,
+      breakdown: `Base (${baseCredits}) + Prompt Depth (+${promptComplexityBonus}) + Scope (+${lengthBonus})`,
+      promptTokensEst,
+    };
+  }
+
   private async deductCredits(
     userId: string,
     credits: number,
@@ -79,7 +198,7 @@ export class AIService {
     if (available < credits) {
       const hoursLeft = Math.max(1, Math.ceil(refillSecondsRemaining / 3600));
       throw new AppError(
-        `Insufficient AI credits. Required: ${credits}, Remaining: ${available}. Your daily allowance (+${dailyAllocation} credits) will refill in ${hoursLeft}h.`,
+        `Insufficient AI credits. Required: ${credits} credits (based on prompt depth and document scope), Remaining: ${available}. Your daily allowance (+${dailyAllocation} credits) will refill in ${hoursLeft}h.`,
         402,
         'AI_CREDITS_EXHAUSTED'
       );
@@ -120,15 +239,18 @@ export class AIService {
     prompt: string;
     tone?: string;
     language?: string;
-    length?: 'Short' | 'Medium' | 'Long';
+    length?: 'Short' | 'Medium' | 'Long' | 'Comprehensive';
     format?: string;
   }) {
-    const creditsRequired = data.length === 'Long' ? 3 : 2;
-    const creditInfo = await this.deductCredits(userId, creditsRequired, 'DOCUMENT_WIZARD', data.prompt);
+    const { credits } = this.calculateDynamicCredits('DOCUMENT_WIZARD', data.prompt, {
+      length: data.length,
+      format: data.format,
+    });
+    const creditInfo = await this.deductCredits(userId, credits, 'DOCUMENT_WIZARD', data.prompt);
 
     const provider = this.getProvider();
     const generatedText = await provider.generateText({
-      prompt: `Create a comprehensive ${data.documentType} in ${data.language || 'English'} with a ${data.tone || 'Professional'} tone.\nRequirements:\n${data.prompt}`,
+      prompt: `Create a comprehensive ${data.documentType} in ${data.language || 'English'} with a ${data.tone || 'Professional'} tone.\nScope / Length: ${data.length || 'Medium'}\nRequirements:\n${data.prompt}`,
       tone: data.tone,
     });
 
@@ -146,36 +268,46 @@ export class AIService {
     targetLanguage?: string;
     instructions?: string;
   }) {
-    const creditInfo = await this.deductCredits(userId, 1, 'WRITER', data.content.slice(0, 60));
+    const { credits } = this.calculateDynamicCredits('WRITER', data.content);
+    const creditInfo = await this.deductCredits(userId, credits, 'WRITER', data.content.slice(0, 60));
     const provider = this.getProvider();
     const result = await provider.rewriteText(data.content, data.action, 'Professional', data.targetLanguage);
     return { result, ...creditInfo };
   }
 
   async summarize(userId: string, data: { text: string; length?: 'short' | 'medium' | 'detailed' }) {
-    const creditInfo = await this.deductCredits(userId, 1, 'SUMMARIZE', data.text.slice(0, 60));
+    const { credits } = this.calculateDynamicCredits('SUMMARIZE', data.text, { length: data.length });
+    const creditInfo = await this.deductCredits(userId, credits, 'SUMMARIZE', data.text.slice(0, 60));
     const provider = this.getProvider();
     const summary = await provider.summarizeText(data.text, data.length || 'medium');
     return { summary, ...creditInfo };
   }
 
   async chatWithPdf(userId: string, data: { prompt: string; pdfContext?: string; documentId?: string }) {
-    const creditInfo = await this.deductCredits(userId, 1, 'PDF_CHAT', data.prompt, data.documentId);
+    const { credits } = this.calculateDynamicCredits('PDF_CHAT', data.prompt, {
+      contextLength: data.pdfContext?.length,
+    });
+    const creditInfo = await this.deductCredits(userId, credits, 'PDF_CHAT', data.prompt, data.documentId);
     const provider = this.getProvider();
     const response = await provider.answerPdfQuestion(data.pdfContext || '', data.prompt);
     return { ...response, ...creditInfo };
   }
 
   async analyzeExcel(userId: string, data: { data?: any; prompt?: string; action?: string }) {
-    const creditInfo = await this.deductCredits(userId, 2, 'EXCEL_ANALYST', data.prompt);
+    const { credits } = this.calculateDynamicCredits('EXCEL_ANALYST', data.prompt || '', {
+      contextLength: data.data ? JSON.stringify(data.data).length : 0,
+    });
+    const creditInfo = await this.deductCredits(userId, credits, 'EXCEL_ANALYST', data.prompt);
     const provider = this.getProvider();
     const analysis = await provider.analyzeSpreadsheet(data.data, data.action || 'analyze', data.prompt);
     return { analysis, ...creditInfo };
   }
 
   async generatePresentation(userId: string, data: { topic: string; slideCount?: number; audience?: string; tone?: string }) {
-    const creditsRequired = 3;
-    const creditInfo = await this.deductCredits(userId, creditsRequired, 'PRESENTATION_GEN', data.topic);
+    const { credits } = this.calculateDynamicCredits('PRESENTATION_GEN', data.topic, {
+      slideCount: data.slideCount,
+    });
+    const creditInfo = await this.deductCredits(userId, credits, 'PRESENTATION_GEN', data.topic);
     const provider = this.getProvider();
     const presentation = await provider.generatePresentationOutline(
       data.topic,
@@ -208,8 +340,16 @@ export class AIService {
       detectedFormat = 'PDF';
     }
 
-    const creditsRequired = detectedFormat === 'PPT' || detectedFormat === 'EXCEL' ? 3 : 2;
-    const creditInfo = await this.deductCredits(userId, creditsRequired, 'DOCUMENT_WIZARD', data.prompt);
+    const { credits } = this.calculateDynamicCredits(
+      detectedFormat === 'PPT' ? 'PRESENTATION_GEN' : detectedFormat === 'EXCEL' ? 'EXCEL_ANALYST' : 'ARTIFACT_GEN',
+      data.prompt,
+      {
+        slideCount: data.slideCount,
+        contextLength: data.context?.length,
+        format: detectedFormat,
+      }
+    );
+    const creditInfo = await this.deductCredits(userId, credits, 'DOCUMENT_WIZARD', data.prompt);
     const provider = this.getProvider();
 
     if (detectedFormat === 'PPT') {

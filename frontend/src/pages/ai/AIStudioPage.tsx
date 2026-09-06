@@ -26,7 +26,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { aiService } from '../../services/aiService';
-import { useCreditStore, formatTimeRemaining } from '../../store/creditStore';
+import { useCreditStore, formatTimeRemaining, estimateDynamicCredits } from '../../store/creditStore';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import {
@@ -53,7 +53,7 @@ export const AIStudioPage: React.FC = () => {
   const [docType, setDocType] = useState('Executive Proposal');
   const [wizardPrompt, setWizardPrompt] = useState('');
   const [tone, setTone] = useState('Professional');
-  const [length, setLength] = useState<'Short' | 'Medium' | 'Long'>('Medium');
+  const [length, setLength] = useState<'Short' | 'Medium' | 'Long' | 'Comprehensive'>('Medium');
   const [language, setLanguage] = useState('English');
   const [isGenerating, setIsGenerating] = useState(false);
   const [wizardResult, setWizardResult] = useState<any>(null);
@@ -75,6 +75,11 @@ export const AIStudioPage: React.FC = () => {
   const [writerInput, setWriterInput] = useState('');
   const [writerOutput, setWriterOutput] = useState('');
   const [isWriterLoading, setIsWriterLoading] = useState(false);
+
+  // Dynamic Live Credit Estimators (reactive as user types prompt)
+  const liveWizardCost = estimateDynamicCredits('DOCUMENT_WIZARD', wizardPrompt, { length });
+  const liveChatCost = estimateDynamicCredits('PDF_CHAT', pdfQuestion);
+  const liveWriterCost = estimateDynamicCredits('WRITER', writerInput);
 
   // Sync state changes
   useEffect(() => {
@@ -98,7 +103,7 @@ export const AIStudioPage: React.FC = () => {
   const handleRunWizard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!wizardPrompt.trim()) return;
-    const required = length === 'Long' ? 3 : 2;
+    const required = liveWizardCost.totalCredits;
     if (availableCredits < required) {
       toast.error(`Insufficient AI credits! You need ${required} credits (Have: ${availableCredits}). Daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
       return;
@@ -113,7 +118,7 @@ export const AIStudioPage: React.FC = () => {
         language,
       });
       setWizardResult(res);
-      toast.success('Document synthesized by Gemini AI!');
+      toast.success(`Document synthesized by Gemini AI! (-${res.creditsDeducted || required}⚡)`);
     } catch {
       toast.error('Generation request encountered an error, used safe fallback.');
     } finally {
@@ -124,8 +129,9 @@ export const AIStudioPage: React.FC = () => {
   const handleSendPdfChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pdfQuestion.trim()) return;
-    if (availableCredits < 1) {
-      toast.error(`Out of AI credits for today! Your daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
+    const requiredChatCredits = liveChatCost.totalCredits;
+    if (availableCredits < requiredChatCredits) {
+      toast.error(`Requires ${requiredChatCredits} AI credits (${availableCredits} available). Your daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
       return;
     }
     const q = pdfQuestion;
@@ -152,8 +158,9 @@ export const AIStudioPage: React.FC = () => {
 
   const handleRunWriter = async () => {
     if (!writerInput.trim()) return;
-    if (availableCredits < 1) {
-      toast.error(`Out of AI credits for today! Your daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
+    const requiredWriterCredits = liveWriterCost.totalCredits;
+    if (availableCredits < requiredWriterCredits) {
+      toast.error(`Requires ${requiredWriterCredits} AI credits (${availableCredits} available). Your daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
       return;
     }
     setIsWriterLoading(true);
@@ -164,7 +171,7 @@ export const AIStudioPage: React.FC = () => {
         targetLanguage: writerLanguage,
       });
       setWriterOutput(res.result);
-      toast.success('Content transformed by Gemini!');
+      toast.success(`Content transformed by Gemini! (-${res.creditsDeducted || requiredWriterCredits}⚡)`);
     } catch {
       toast.error('Writer request failed');
     } finally {
@@ -390,11 +397,25 @@ export const AIStudioPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Document Scope / Length</label>
+                  <select
+                    value={length}
+                    onChange={(e) => setLength(e.target.value as any)}
+                    className="w-full mt-1.5 px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-semibold"
+                  >
+                    <option value="Short">Short Summary (3–5⚡)</option>
+                    <option value="Medium">Medium Standard (7–12⚡)</option>
+                    <option value="Long">Long Comprehensive (15–25⚡)</option>
+                    <option value="Comprehensive">Enterprise Full Brief (35–50⚡)</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Language</label>
                   <select
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full mt-1.5 px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"
+                    className="w-full mt-1.5 px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-semibold"
                   >
                     <option value="English">English</option>
                     <option value="Tamil">Tamil (தமிழ்)</option>
@@ -404,27 +425,80 @@ export const AIStudioPage: React.FC = () => {
                     <option value="Spanish">Spanish</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tone</label>
-                  <select
-                    value={tone}
-                    onChange={(e) => setTone(e.target.value)}
-                    className="w-full mt-1.5 px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"
-                  >
-                    <option value="Professional">Professional</option>
-                    <option value="Executive">Executive</option>
-                    <option value="Persuasive">Persuasive</option>
-                    <option value="Technical">Technical</option>
-                  </select>
-                </div>
               </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tone</label>
+                <select
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                  className="w-full mt-1.5 px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"
+                >
+                  <option value="Professional">Professional</option>
+                  <option value="Executive">Executive</option>
+                  <option value="Persuasive">Persuasive</option>
+                  <option value="Technical">Technical</option>
+                </select>
+              </div>
+
+              {/* Dynamic Live Cost Estimator Card */}
+              {(() => {
+                const est = estimateDynamicCredits('DOCUMENT_WIZARD', wizardPrompt, { length });
+                const hasEnough = availableCredits >= est.credits;
+                return (
+                  <div
+                    className={`p-3 rounded-2xl border text-xs flex items-center justify-between transition-all ${
+                      hasEnough
+                        ? 'bg-purple-500/10 border-purple-500/30'
+                        : 'bg-rose-500/10 border-rose-500/40'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg ${hasEnough ? 'bg-purple-600 text-white' : 'bg-rose-600 text-white'}`}>
+                        <Zap className="w-3.5 h-3.5 fill-current animate-pulse" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <span>Prompt Cost:</span>
+                          <span className={hasEnough ? 'text-purple-600 dark:text-purple-400 font-extrabold' : 'text-rose-600 font-extrabold'}>
+                            ⚡ {est.credits} Credits
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          {est.label} • {wizardPrompt.length} chars
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      {hasEnough ? (
+                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                          ✓ {availableCredits} Available
+                        </span>
+                      ) : (
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold text-rose-600">
+                            Insufficient ({availableCredits} left)
+                          </span>
+                          <div className="text-[9px] text-purple-600 dark:text-purple-400">
+                            Refills in {formatTimeRemaining(refillSecondsRemaining)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <Button
                 type="submit"
                 variant="gradient"
                 size="md"
                 isLoading={isGenerating}
+                disabled={(() => {
+                  const est = estimateDynamicCredits('DOCUMENT_WIZARD', wizardPrompt, { length });
+                  return availableCredits < est.credits;
+                })()}
                 leftIcon={<Sparkles className="w-4 h-4" />}
                 className="w-full shadow-glow"
               >
@@ -561,6 +635,16 @@ export const AIStudioPage: React.FC = () => {
               placeholder="Paste or type any text here to transform or translate..."
               className="w-full p-3.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:outline-none leading-relaxed"
             />
+
+            {/* Dynamic Cost Estimator Strip for Writer */}
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50/50 dark:bg-purple-950/30 border border-purple-200/50 dark:border-purple-800/40 text-[11px]">
+              <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-medium">
+                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <span>Est. Cost: <strong>{liveWriterCost.totalCredits}⚡</strong> ({liveWriterCost.complexity} complexity)</span>
+              </div>
+              <span className="text-slate-400 font-mono text-[10px]">{writerInput.length} chars</span>
+            </div>
+
             <Button
               variant="gradient"
               size="sm"
@@ -665,19 +749,30 @@ export const AIStudioPage: React.FC = () => {
             )}
           </div>
 
-          {/* Prompt Bar */}
-          <form onSubmit={handleSendPdfChat} className="flex gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <input
-              type="text"
-              value={pdfQuestion}
-              onChange={(e) => setPdfQuestion(e.target.value)}
-              placeholder={`Ask any question about ${uploadedDocName}...`}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-            />
-            <Button type="submit" variant="gradient" size="sm" isLoading={isChatLoading}>
-              <Send className="w-4 h-4" />
-            </Button>
-          </form>
+          {/* Prompt Bar with Live Dynamic Cost */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+            <div className="flex items-center justify-between px-1 text-[11px]">
+              <span className="text-slate-400">Ask Copilot</span>
+              {pdfQuestion.trim().length > 0 && (
+                <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+                  Est. {liveChatCost.totalCredits}⚡ ({liveChatCost.complexity})
+                </span>
+              )}
+            </div>
+            <form onSubmit={handleSendPdfChat} className="flex gap-2">
+              <input
+                type="text"
+                value={pdfQuestion}
+                onChange={(e) => setPdfQuestion(e.target.value)}
+                placeholder={`Ask any question about ${uploadedDocName}...`}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+              <Button type="submit" variant="gradient" size="sm" isLoading={isChatLoading}>
+                <Send className="w-4 h-4" />
+              </Button>
+            </form>
+          </div>
         </div>
       )}
 

@@ -14,7 +14,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { aiService } from '../../services/aiService';
-import { useCreditStore, formatTimeRemaining } from '../../store/creditStore';
+import { useCreditStore, formatTimeRemaining, estimateDynamicCredits } from '../../store/creditStore';
 import { Button } from '../common/Button';
 import { toast } from 'sonner';
 
@@ -36,6 +36,8 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [aiOutput, setAiOutput] = useState('');
 
+  const livePromptCost = estimateDynamicCredits('WRITER', prompt);
+
   const quickPrompts = [
     { label: 'Rewrite for Clarity', action: 'rewrite' },
     { label: 'Expand Content', action: 'expand' },
@@ -46,8 +48,8 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   ];
 
   const handleExecuteAI = async (action: string = selectedAction, lang?: string) => {
-    if (availableCredits < 1) {
-      toast.error(`Out of AI credits for today! Your daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
+    if (availableCredits < livePromptCost.totalCredits) {
+      toast.error(`Requires ${livePromptCost.totalCredits} AI credits (${availableCredits} available). Your daily allowance refills in ${formatTimeRemaining(refillSecondsRemaining)}.`);
       return;
     }
 
@@ -60,7 +62,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         targetLanguage: lang || 'Spanish',
       });
       setAiOutput(res.result);
-      toast.success('AI generation completed!');
+      toast.success(`AI generation completed! (-${res.creditsDeducted || livePromptCost.totalCredits}⚡)`);
     } catch {
       toast.error('AI request failed. Please try again.');
     } finally {
@@ -106,7 +108,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
       <div className="my-3">
         <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
           <span>Suggested Actions</span>
-          <span className="text-[9px] text-purple-500 normal-case font-medium">1 credit each</span>
+          <span className="text-[9px] text-purple-500 normal-case font-medium">1-2 credits</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {quickPrompts.map((q, i) => (
@@ -168,8 +170,17 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         )}
       </div>
 
-      {/* Prompt Input Box */}
+      {/* Prompt Input Box with Live Cost Indicator */}
       <div className="pt-2">
+        <div className="flex items-center justify-between pb-1 px-1">
+          <span className="text-[10px] text-slate-400">Prompt / Custom Instructions</span>
+          {prompt.trim().length > 0 && (
+            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-0.5">
+              <Zap className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
+              Est. {livePromptCost.totalCredits}⚡ ({livePromptCost.complexity})
+            </span>
+          )}
+        </div>
         <div className="relative">
           <textarea
             rows={2}
