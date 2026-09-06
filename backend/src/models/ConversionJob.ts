@@ -2,7 +2,11 @@ import mongoose, { Schema, Document as MongooseDocument } from 'mongoose';
 
 export enum ConversionStatus {
   QUEUED = 'QUEUED',
+  ANALYZING = 'ANALYZING',
+  PREPARING = 'PREPARING',
   PROCESSING = 'PROCESSING',
+  VALIDATING = 'VALIDATING',
+  FIDELITY_CHECK = 'FIDELITY_CHECK',
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
   CANCELLED = 'CANCELLED',
@@ -19,6 +23,10 @@ export interface IConversionJob extends MongooseDocument {
   progress: number; // 0 to 100
   downloadUrl?: string;
   storageKey?: string;
+  converterEngine?: string;
+  pageCount?: number;
+  fidelityScore?: number;
+  warnings?: string[];
   errorMessage?: string;
   createdAt: Date;
   completedAt?: Date;
@@ -36,6 +44,10 @@ const ConversionJobSchema = new Schema<IConversionJob>(
     progress: { type: Number, default: 0 },
     downloadUrl: { type: String },
     storageKey: { type: String },
+    converterEngine: { type: String },
+    pageCount: { type: Number },
+    fidelityScore: { type: Number, default: 100 },
+    warnings: [{ type: String }],
     errorMessage: { type: String },
     completedAt: { type: Date },
   },
