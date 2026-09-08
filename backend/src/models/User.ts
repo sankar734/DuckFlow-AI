@@ -20,6 +20,8 @@ export interface IUser extends MongooseDocument {
   isActive: boolean;
   isBlocked: boolean;
   planId: string;
+  planExpiresAt?: Date;
+  subscriptionStatus?: string;
   storageUsed: number; // in bytes
   storageLimit: number; // in bytes (e.g. 5GB = 5 * 1024 * 1024 * 1024)
   aiCredits: number;
@@ -54,7 +56,9 @@ const UserSchema = new Schema<IUser>(
     phoneVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     isBlocked: { type: Boolean, default: false },
-    planId: { type: String, default: 'free' },
+    planId: { type: String, default: 'free', index: true },
+    planExpiresAt: { type: Date },
+    subscriptionStatus: { type: String, default: 'ACTIVE' },
     storageUsed: { type: Number, default: 0 },
     storageLimit: { type: Number, default: 5 * 1024 * 1024 * 1024 }, // 5GB default
     aiCredits: { type: Number, default: 50 },

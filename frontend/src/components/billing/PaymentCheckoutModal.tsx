@@ -63,7 +63,7 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
   const [isAutopayEnabled, setIsAutopayEnabled] = useState(true);
 
   // Selected UPI App
-  const [selectedUpiApp, setSelectedUpiApp] = useState<'gpay' | 'phonepe' | 'paytm' | 'bhim' | 'cred' | 'any'>('gpay');
+  const [selectedUpiApp, setSelectedUpiApp] = useState<'gpay' | 'phonepe' | 'paytm' | 'navi' | 'bhim' | 'cred' | 'any'>('gpay');
 
   // UPI State
   const [upiId, setUpiId] = useState(user?.email ? `${user.email.split('@')[0]}@okaxis` : 'user@okaxis');
@@ -88,7 +88,7 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
   const [completedTxnId, setCompletedTxnId] = useState('');
   const [completedInvoiceNum, setCompletedInvoiceNum] = useState('');
 
-  const merchantVpa = orderData?.merchantVpa || 'docuflow.ai@okhdfcbank';
+  const merchantVpa = orderData?.merchantVpa || 'sankars460@naviaxis';
 
   // Fetch / Create authentic order on open
   useEffect(() => {
@@ -154,7 +154,7 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
   };
 
   // Launch direct UPI App on mobile / desktop
-  const handleLaunchUpiApp = (appId?: 'gpay' | 'phonepe' | 'paytm' | 'bhim' | 'cred' | 'any') => {
+  const handleLaunchUpiApp = (appId?: 'gpay' | 'phonepe' | 'paytm' | 'navi' | 'bhim' | 'cred' | 'any') => {
     const app = appId || selectedUpiApp;
     setSelectedUpiApp(app);
 
@@ -170,6 +170,8 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
       targetUrl = `paytmmp://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent('DocuFlow AI')}&am=${totalPrice}&cu=INR&tr=${orderData?.orderId || `DF_${Date.now()}`}&tn=${encodeURIComponent(note)}`;
     } else if (app === 'cred') {
       targetUrl = `cred://upi/pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent('DocuFlow AI')}&am=${totalPrice}&cu=INR&tr=${orderData?.orderId || `DF_${Date.now()}`}&tn=${encodeURIComponent(note)}`;
+    } else if (app === 'navi') {
+      targetUrl = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent('DocuFlow AI')}&am=${totalPrice}&cu=INR&tr=${orderData?.orderId || `DF_${Date.now()}`}&tn=${encodeURIComponent(note)}`;
     }
 
     try {
@@ -183,11 +185,12 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
       gpay: 'Google Pay',
       phonepe: 'PhonePe',
       paytm: 'Paytm UPI',
+      navi: 'Navi UPI',
       bhim: 'BHIM UPI',
       cred: 'CRED UPI',
       any: 'UPI App',
     };
-    toast.info(`Redirecting to ${appNames[app] || 'UPI App'}. Complete payment of ₹${totalPrice.toLocaleString()} and return here.`);
+    toast.info(`Redirecting to ${appNames[app] || 'UPI App'}. Complete payment of ₹${totalPrice.toLocaleString()} to ${merchantVpa} and return here.`);
   };
 
   const handleSendUpiCollectRequest = (e: React.FormEvent) => {
@@ -221,12 +224,23 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
 
       const newCredits = plan.id === 'business' || plan.id === 'enterprise' ? 2500 : 500;
       const newStorage = (plan.id === 'business' || plan.id === 'enterprise' ? 250 : 50) * 1024 * 1024 * 1024;
+      const dailyAllocation = plan.id === 'business' || plan.id === 'enterprise' ? 1000 : 250;
+
+      const expiryDate = new Date();
+      if (plan.billingCycle === 'yearly') {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      } else {
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+      }
 
       setCompletedTxnId(res.transactionId || activeUtr);
       setCompletedInvoiceNum(res.invoiceNumber || `INV-2026-${Math.floor(10000 + Math.random() * 90000)}`);
 
       updateUser({
         planId: plan.id,
+        planExpiresAt: expiryDate.toISOString() as any,
+        subscriptionStatus: 'ACTIVE',
+        dailyCreditsAllocation: dailyAllocation,
         aiCredits: newCredits,
         aiCreditsUsed: 0,
         storageLimit: newStorage,
@@ -247,8 +261,15 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
     } catch {
       // Graceful fallback activation
       const newCredits = plan.id === 'business' || plan.id === 'enterprise' ? 2500 : 500;
+      const dailyAllocation = plan.id === 'business' || plan.id === 'enterprise' ? 1000 : 250;
+      const expiryDate = new Date();
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
+
       updateUser({
         planId: plan.id,
+        planExpiresAt: expiryDate.toISOString() as any,
+        subscriptionStatus: 'ACTIVE',
+        dailyCreditsAllocation: dailyAllocation,
         aiCredits: newCredits,
         aiCreditsUsed: 0,
         storageLimit: (plan.id === 'business' || plan.id === 'enterprise' ? 250 : 50) * 1024 * 1024 * 1024,
@@ -484,6 +505,14 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
                           desc: 'Paytm UPI',
                         },
                         {
+                          id: 'navi',
+                          name: 'Navi UPI',
+                          badge: 'Official',
+                          color: 'border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300',
+                          iconBg: 'bg-teal-600 text-white',
+                          desc: 'Navi Axis UPI',
+                        },
+                        {
                           id: 'bhim',
                           name: 'BHIM UPI',
                           badge: 'NPCI',
@@ -560,6 +589,8 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
                         ? 'PhonePe'
                         : selectedUpiApp === 'paytm'
                         ? 'Paytm'
+                        : selectedUpiApp === 'navi'
+                        ? 'Navi UPI'
                         : selectedUpiApp === 'bhim'
                         ? 'BHIM UPI'
                         : selectedUpiApp === 'cred'

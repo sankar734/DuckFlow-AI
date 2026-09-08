@@ -157,8 +157,8 @@ export const billingService = {
       const tax = Math.round(baseAmount * 0.18);
       const totalAmount = baseAmount + tax;
       const orderId = `DF_ORD_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
-      const merchantVpa = 'docuflow.ai@okhdfcbank';
-      const payeeName = 'DocuFlow AI Enterprise';
+      const merchantVpa = 'sankars460@naviaxis';
+      const payeeName = 'DocuFlow AI';
       const note = `DocuFlow ${planId.toUpperCase()} Subscription`;
       const upiUri = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(payeeName)}&am=${totalAmount}&cu=INR&tr=${orderId}&tn=${encodeURIComponent(note)}`;
 

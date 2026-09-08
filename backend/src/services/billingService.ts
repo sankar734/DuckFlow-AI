@@ -71,11 +71,11 @@ export class BillingService {
     const totalAmount = baseAmount + tax;
 
     const orderId = `DF_ORD_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
-    const merchantVpa = 'docuflow.ai@okhdfcbank';
-    const payeeName = 'DocuFlow AI Enterprise';
+    const merchantVpa = 'sankars460@naviaxis';
+    const payeeName = 'DocuFlow AI';
     const note = `DocuFlow ${planInfo.name} ${cycle === 'yearly' ? 'Annual' : 'Monthly'} Subscription`;
 
-    // Standard NPCI UPI URI Scheme
+    // Standard NPCI UPI URI Scheme with merchant sankars460@naviaxis
     const upiUri = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(payeeName)}&am=${totalAmount}&cu=INR&tr=${orderId}&tn=${encodeURIComponent(note)}`;
 
     // Create a pending payment record
@@ -240,8 +240,11 @@ export class BillingService {
       );
     } catch {}
 
-    // Upgrade user limits & credits
+    // Upgrade user limits & credits and persist subscription duration (like Spotify / ChatGPT / Canva)
     user.planId = data.planId.toLowerCase();
+    user.planExpiresAt = endDate;
+    user.subscriptionStatus = 'ACTIVE';
+    user.dailyCreditsAllocation = data.planId.toLowerCase() === 'pro' ? 250 : 1000;
     user.storageLimit = activePlan.storageLimit;
     user.aiCredits = activePlan.aiCreditsMonthly;
     user.aiCreditsUsed = 0; // Fresh reset for upgraded tier

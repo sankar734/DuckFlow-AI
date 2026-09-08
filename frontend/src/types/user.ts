@@ -16,6 +16,8 @@ export interface User {
   aiCreditsUsed: number;
   lastCreditRefillAt?: string;
   dailyCreditsAllocation?: number;
+  planExpiresAt?: string | Date;
+  subscriptionStatus?: string;
   preferences: {
     theme: 'light' | 'dark' | 'system';
     language: string;
