@@ -12,7 +12,7 @@ export interface ISubscription extends MongooseDocument {
   userId: mongoose.Types.ObjectId;
   teamId?: mongoose.Types.ObjectId;
   planId: string; // 'free' | 'pro' | 'business' | 'enterprise'
-  provider: 'razorpay' | 'stripe' | 'manual';
+  provider: 'razorpay' | 'stripe' | 'manual' | 'upi';
   providerSubscriptionId?: string;
   status: SubscriptionStatus;
   billingCycle: 'monthly' | 'yearly';
@@ -21,6 +21,8 @@ export interface ISubscription extends MongooseDocument {
   startDate: Date;
   endDate: Date;
   cancelAtPeriodEnd: boolean;
+  isAutopayEnabled?: boolean;
+  paymentMethod?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,7 +32,7 @@ const SubscriptionSchema = new Schema<ISubscription>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     teamId: { type: Schema.Types.ObjectId, ref: 'Team' },
     planId: { type: String, required: true, default: 'free' },
-    provider: { type: String, enum: ['razorpay', 'stripe', 'manual'], default: 'razorpay' },
+    provider: { type: String, enum: ['razorpay', 'stripe', 'manual', 'upi'], default: 'razorpay' },
     providerSubscriptionId: { type: String },
     status: { type: String, enum: Object.values(SubscriptionStatus), default: SubscriptionStatus.ACTIVE, index: true },
     billingCycle: { type: String, enum: ['monthly', 'yearly'], default: 'monthly' },
@@ -39,6 +41,8 @@ const SubscriptionSchema = new Schema<ISubscription>(
     startDate: { type: Date, default: Date.now },
     endDate: { type: Date },
     cancelAtPeriodEnd: { type: Boolean, default: false },
+    isAutopayEnabled: { type: Boolean, default: true },
+    paymentMethod: { type: String, default: 'upi' },
   },
   { timestamps: true }
 );

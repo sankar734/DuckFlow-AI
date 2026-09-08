@@ -81,6 +81,27 @@ export const BillingPage: React.FC = () => {
     },
   ];
 
+  const handleSelectPlan = async (plan: (typeof plans)[0]) => {
+    if (plan.price === 0 || plan.id === 'free') {
+      try {
+        await billingService.switchToFreePlan();
+        updateUser({
+          planId: 'free',
+          aiCredits: 50,
+          aiCreditsUsed: 0,
+          storageLimit: 5 * 1024 * 1024 * 1024,
+        });
+        fetchCredits();
+        toast.success('🎉 Successfully activated Free Plan (50 daily AI credits, 5 daily conversions)!');
+      } catch {
+        toast.error('Failed to switch to Free plan.');
+      }
+      return;
+    }
+
+    handleOpenCheckout(plan);
+  };
+
   const handleOpenCheckout = (plan: (typeof plans)[0]) => {
     setCheckoutPlan({
       id: plan.id,
@@ -100,7 +121,7 @@ export const BillingPage: React.FC = () => {
       id: `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
       plan: `${upgradedPlan.name} ${billingCycle === 'monthly' ? 'Monthly' : 'Yearly'} Plan`,
-      amount: `₹${upgradedPlan.price.toLocaleString()}.00`,
+      amount: `₹${Math.round(upgradedPlan.price * 1.18).toLocaleString()}.00`,
       status: 'PAID',
     };
     setInvoices((prev) => [newInvoice, ...prev]);
@@ -114,7 +135,7 @@ export const BillingPage: React.FC = () => {
           Membership & Credits
         </Badge>
         <h1 className="text-2xl font-black text-slate-900 dark:text-white">Billing & AI Credits</h1>
-        <p className="text-xs text-slate-400">Manage your subscription, credit allocations, and daily refills</p>
+        <p className="text-xs text-slate-400">Manage your subscription, direct UPI payment, autopay, and daily refills</p>
       </div>
 
       {/* Credit Overview Meter Card */}
@@ -123,7 +144,7 @@ export const BillingPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-amber-400 fill-amber-400 animate-pulse" />
             <span className="text-xs font-bold uppercase tracking-wider text-purple-300">
-              Active AI Magic Credit Allocation
+              Active Plan: <strong className="text-white uppercase">{user?.planId || 'Free'}</strong>
             </span>
           </div>
           <div className="text-3xl font-black">
@@ -141,13 +162,19 @@ export const BillingPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col gap-2 w-full md:w-auto shrink-0">
-          <Button
-            variant="gradient"
-            size="md"
-            onClick={() => handleOpenCheckout(plans[1])}
-          >
-            Upgrade to Pro
-          </Button>
+          {(user?.planId || 'free').toLowerCase() === 'free' ? (
+            <Button
+              variant="gradient"
+              size="md"
+              onClick={() => handleOpenCheckout(plans[1])}
+            >
+              Upgrade to Pro (₹{plans[1].price})
+            </Button>
+          ) : (
+            <Badge variant="brand" size="md" className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-bold py-2 px-4 text-xs">
+              ✓ {user?.planId?.toUpperCase()} Subscription Active
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -174,7 +201,7 @@ export const BillingPage: React.FC = () => {
       {/* Plan Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((p) => {
-          const isCurrent = (user?.planId || 'pro').toLowerCase() === p.id;
+          const isCurrent = (user?.planId || 'free').toLowerCase() === p.id;
           return (
             <div
               key={p.id}
@@ -217,12 +244,12 @@ export const BillingPage: React.FC = () => {
                   </Button>
                 ) : (
                   <Button
-                    variant={p.isPopular ? 'gradient' : 'primary'}
+                    variant={p.isPopular ? 'gradient' : (p.price === 0 ? 'outline' : 'primary')}
                     size="sm"
                     className="w-full shadow-xs"
-                    onClick={() => handleOpenCheckout(p)}
+                    onClick={() => handleSelectPlan(p)}
                   >
-                    Select {p.name}
+                    {p.price === 0 ? 'Activate Free Plan' : `Upgrade to ${p.name}`}
                   </Button>
                 )}
               </div>

@@ -36,9 +36,11 @@ ocrRouter.post('/extract', upload.single('image'), (req, res, next) => ocrContro
 // Billing Router
 export const billingRouter = Router();
 billingRouter.get('/plans', (req, res, next) => billingController.getPlans(req as any, res, next));
+billingRouter.post('/switch-free', authenticate, (req, res, next) => billingController.switchToFree(req as any, res, next));
 billingRouter.post('/create-order', authenticate, (req, res, next) => billingController.createOrder(req as any, res, next));
 billingRouter.post('/verify-payment', authenticate, (req, res, next) => billingController.verifyPayment(req as any, res, next));
 billingRouter.get('/invoices', authenticate, (req, res, next) => billingController.getInvoices(req as any, res, next));
+billingRouter.get('/admin/transactions', authenticate, requireAdmin, (req, res, next) => billingController.getAdminTransactions(req as any, res, next));
 
 // Admin Router
 export const adminRouter = Router();

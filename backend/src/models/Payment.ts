@@ -3,10 +3,14 @@ import mongoose, { Schema, Document as MongooseDocument } from 'mongoose';
 export interface IPayment extends MongooseDocument {
   userId: mongoose.Types.ObjectId;
   subscriptionId?: mongoose.Types.ObjectId;
-  provider: 'razorpay' | 'stripe' | 'manual';
+  provider: 'razorpay' | 'stripe' | 'manual' | 'upi';
   providerOrderId: string;
   providerPaymentId?: string;
   providerSignature?: string;
+  paymentMethod?: string;
+  utr?: string;
+  upiId?: string;
+  isAutopayEnabled?: boolean;
   amount: number;
   currency: string;
   status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
@@ -20,10 +24,14 @@ const PaymentSchema = new Schema<IPayment>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription' },
-    provider: { type: String, enum: ['razorpay', 'stripe', 'manual'], default: 'razorpay' },
+    provider: { type: String, enum: ['razorpay', 'stripe', 'manual', 'upi'], default: 'razorpay' },
     providerOrderId: { type: String, required: true, index: true },
     providerPaymentId: { type: String, index: true },
     providerSignature: { type: String },
+    paymentMethod: { type: String, default: 'upi' },
+    utr: { type: String, index: true },
+    upiId: { type: String },
+    isAutopayEnabled: { type: Boolean, default: true },
     amount: { type: Number, required: true },
     currency: { type: String, default: 'INR' },
     status: { type: String, enum: ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'], default: 'PENDING', index: true },

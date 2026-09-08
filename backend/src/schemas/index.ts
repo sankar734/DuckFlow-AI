@@ -103,8 +103,13 @@ export const createOrderSchema = z.object({
 });
 
 export const verifyPaymentSchema = z.object({
-  razorpay_order_id: z.string(),
-  razorpay_payment_id: z.string(),
-  razorpay_signature: z.string(),
+  razorpay_order_id: z.string().optional(),
+  razorpay_payment_id: z.string().optional(),
+  razorpay_signature: z.string().optional(),
   planId: z.string(),
+  billingCycle: z.enum(['monthly', 'yearly']).optional().default('monthly'),
+  paymentMethod: z.enum(['card', 'upi', 'netbanking', 'wallet']).optional().default('upi'),
+  upiId: z.string().optional(),
+  utr: z.string().optional(),
+  isAutopayEnabled: z.boolean().optional().default(true),
 });

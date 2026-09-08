@@ -95,6 +95,15 @@ export class BillingController {
     }
   }
 
+  async switchToFree(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await billingService.switchToFreePlan(req.user!._id.toString());
+      sendSuccess(res, result, 'Switched to Free plan');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createOrder(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const validated = createOrderSchema.parse(req.body);
@@ -119,6 +128,15 @@ export class BillingController {
     try {
       const invoices = await billingService.getInvoices(req.user!._id.toString());
       sendSuccess(res, invoices, 'Invoices list');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAdminTransactions(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const txns = await billingService.getAdminTransactions();
+      sendSuccess(res, txns, 'Admin transaction history');
     } catch (error) {
       next(error);
     }
