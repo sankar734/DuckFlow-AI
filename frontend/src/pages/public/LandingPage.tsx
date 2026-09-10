@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
+import { Footer } from '../../components/layout/Footer';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -355,23 +356,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs text-slate-500">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-brand-600 flex items-center justify-center text-white">
-              <Sparkles className="w-3.5 h-3.5" />
-            </div>
-            <span className="font-bold text-slate-900 dark:text-white">DocuFlow AI</span>
-            <span>— © 2026 All rights reserved.</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <Link to="/documents" className="hover:underline">Documents</Link>
-            <Link to="/ai" className="hover:underline">AI Studio</Link>
-            <Link to="/billing" className="hover:underline">Pricing</Link>
-            <Link to="/settings" className="hover:underline">Security</Link>
-          </div>
-        </div>
-      </footer>
+      <Footer variant="full" />
     </div>
   );
 };

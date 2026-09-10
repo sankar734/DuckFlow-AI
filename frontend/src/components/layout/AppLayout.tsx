@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { MobileNav } from './MobileNav';
 import { CommandPalette } from './CommandPalette';
+import { Footer } from './Footer';
 import { MobileScannerModal } from '../scanner/MobileScannerModal';
 import { useUIStore } from '../../store/uiStore';
 
@@ -19,10 +20,13 @@ export const AppLayout: React.FC = () => {
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <Navbar />
 
-        <main className="flex-1 overflow-y-auto pb-24 lg:pb-8 p-2 sm:p-4 lg:p-8">
-          <div className="max-w-7xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto flex flex-col justify-between pb-20 lg:pb-0">
+          <div className="max-w-7xl mx-auto w-full p-2 sm:p-4 lg:p-8 flex-1">
             <Outlet />
           </div>
+
+          {/* Persistent In-App Footer */}
+          <Footer variant="compact" />
         </main>
 
         {/* Mobile Bottom Navigation */}
